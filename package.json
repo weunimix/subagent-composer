@@ -5,12 +5,18 @@
   "type": "module",
   "description": "Compile typed role definitions into DSH agent presets plus a schema-validated delegation tool.",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepare": "npm run build"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./dist/cordis.patch.yml"
+    }
   },
   "dependencies": {
     "yaml": "^2.8.0"
