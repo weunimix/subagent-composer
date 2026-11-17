@@ -21,6 +21,11 @@ export const TOOL_CATALOG: Record<ToolKey, ToolRow> = {
   web: { id: 'tools-web', name: '@deepseek-ai/dsh-tool-web', config: { fetch: true } },
   bash: { id: 'tools-bash', name: '@deepseek-ai/dsh-tool-bash' },
   skill: { id: 'tools-skill', name: '@deepseek-ai/dsh-tool-skill' },
-  todo: { id: 'tools-todo', name: '@deepseek-ai/dsh-tool-todo' },
+  // allowParallelInProgress 是必填项、无默认值：调度者会并发派工，故为 true。
+  todo: {
+    id: 'tools-todo',
+    name: '@deepseek-ai/dsh-tool-todo',
+    config: { allowParallelInProgress: true },
+  },
   'ask-user': { id: 'tools-ask-user', name: '@deepseek-ai/dsh-tool-ask-user' },
 };

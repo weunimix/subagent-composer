@@ -1,4 +1,5 @@
 import type { PresetRow } from './kernel/emit.js';
+import { TOOL_CATALOG } from './kernel/tools.js';
 
 /**
  * 导演 preset：本项目的主会话入口。
@@ -29,9 +30,8 @@ export function directorPreset(roleIds: string[]): PresetRow {
       order: 99,
       plugins: [
         { id: 'persona', name: '@deepseek-ai/dsh-persona', config: { prefix: persona } },
-        { id: 'tools-fs', name: '@deepseek-ai/dsh-tool-fs' },
-        { id: 'tools-todo', name: '@deepseek-ai/dsh-tool-todo' },
-        { id: 'tools-ask-user', name: '@deepseek-ai/dsh-tool-ask-user' },
+        // 工具行同样来自 TOOL_CATALOG，避免必填 config 两处各写一遍。
+        ...(['fs', 'todo', 'ask-user'] as const).map((key) => TOOL_CATALOG[key]),
         {
           id: 'subagent',
           name: '@deepseek-ai/dsh-tool-subagent',
