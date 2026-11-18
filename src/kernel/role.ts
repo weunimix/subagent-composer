@@ -17,6 +17,8 @@ export abstract class SubagentRole {
   abstract readonly when: string;
   readonly order: number = 100;
   readonly tools: readonly ToolKey[] = [];
+  /** 只读角色：产物的 fs 行会关掉 write/edit。 */
+  readonly readOnly: boolean = false;
   abstract readonly task: TaskShape;
   abstract readonly output: OutputShape;
 
@@ -44,6 +46,7 @@ export abstract class SubagentRole {
       when: this.when,
       order: this.order,
       tools: this.tools,
+      readOnly: this.readOnly,
       persona: renderPersona(this),
       task: this.task,
       output: this.output,

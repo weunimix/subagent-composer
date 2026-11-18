@@ -30,6 +30,8 @@ export interface RoleSpec {
   when: string;
   order: number;
   tools: readonly ToolKey[];
+  /** 只读角色：文件工具会关掉 write/edit，防止越界改稿。 */
+  readOnly?: boolean;
   /** 已渲染好的系统提示词文本。 */
   persona: string;
   task: TaskShape;

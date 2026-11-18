@@ -11,7 +11,8 @@ export function toJsonSchema(fields: TaskShape): Record<string, unknown> {
   return {
     type: 'object',
     properties,
-    required,
+    // 空 required 数组在部分校验器里非法，省略更稳。
+    ...(required.length > 0 ? { required } : {}),
     additionalProperties: false,
   };
 }

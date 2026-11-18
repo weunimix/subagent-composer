@@ -32,11 +32,9 @@ export function directorPreset(roleIds: string[]): PresetRow {
         { id: 'persona', name: '@deepseek-ai/dsh-persona', config: { prefix: persona } },
         // 工具行同样来自 TOOL_CATALOG，避免必填 config 两处各写一遍。
         ...(['fs', 'todo', 'ask-user'] as const).map((key) => TOOL_CATALOG[key]),
-        {
-          id: 'subagent',
-          name: '@deepseek-ai/dsh-tool-subagent',
-          config: { provider: 'spawn', toolName: 'subagent', allowedAgentPresets: roleIds },
-        },
+        // 委派工具由本包提供：每个角色一个工具，身份写死在里面，
+        // 不依赖模型记得传 agent_preset（内置 subagent 会静默继承父级组合）。
+        { id: 'delegate', name: 'subagent-composer' },
       ],
     },
   };

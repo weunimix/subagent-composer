@@ -8,5 +8,4 @@ export type {
   ToolKey,
 } from './kernel/types.js';
 export { ROLE_CLASSES, compileRoster } from './roster.js';
-export type { DelegateRequest } from './plugin/delegate.js';
-export { delegateSchema, taskBrief } from './plugin/delegate.js';
+export { renderTask, toolNameOf } from './plugin/delegate.js';

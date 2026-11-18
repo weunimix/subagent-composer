@@ -19,6 +19,11 @@ function toolRows(spec: RoleSpec): PresetRow[] {
   return spec.tools.map((key) => {
     const row = TOOL_CATALOG[key];
     const presetRow: PresetRow = { id: row.id, name: row.name };
+    // 只读角色：fs 行关掉 write / edit，纪律之外再加一道机械约束。
+    if (key === 'fs' && spec.readOnly === true) {
+      presetRow.config = { ...row.config, write: false, edit: false };
+      return presetRow;
+    }
     if (row.config) presetRow.config = row.config;
     return presetRow;
   });

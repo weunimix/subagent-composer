@@ -13,6 +13,7 @@ export class NovelAuditRole extends SubagentRole {
   readonly when = '需要对照锚点判断单章节节点是否合规时';
   readonly order = 101;
   readonly tools: readonly ToolKey[] = ['fs', 'fs-search'];
+  readonly readOnly = true;
 
   readonly task: TaskShape = {
     nodePath: {
