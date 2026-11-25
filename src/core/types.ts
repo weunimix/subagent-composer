@@ -10,8 +10,14 @@ export interface FieldSpec {
   /** 一句话说明。不写示例，不写重复的「请务必」。 */
   desc: string;
   required?: boolean;
-  /** 仅 type: 'string' 时生效，生成 JSON Schema 的 enum。 */
+  /** 仅 type: 'string' / 'string[]' 时生效，生成 JSON Schema 的 enum。 */
   values?: string[];
+  /**
+   * 仅 type: 'object[]' 时生效：数组元素的字段形状。
+   * 省略时元素退化为无约束对象（`items: { type: 'object' }`），
+   * 声明后产出 `items.properties`，结构化交付的子字段才被约束。
+   */
+  fields?: TaskShape;
 }
 
 export type TaskShape = Record<string, FieldSpec>;

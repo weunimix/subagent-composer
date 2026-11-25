@@ -1,29 +1,14 @@
+import { fieldSchema } from './schema.js';
 import type { FieldSpec, RoleSpec } from './types.js';
 
 export type Json = Record<string, unknown>;
 
-/** 字段声明 → JSON Schema 属性节点。 */
+/**
+ * 字段声明 → JSON Schema 属性节点。
+ * 与 outputSchema 共用同一段映射：delegate 入参和结构化交付不会各写一份。
+ */
 export function propertyOf(field: FieldSpec): Json {
-  switch (field.type) {
-    case 'string':
-      return field.values === undefined
-        ? { type: 'string', description: field.desc }
-        : { type: 'string', enum: field.values, description: field.desc };
-    case 'string[]':
-      return {
-        type: 'array',
-        description: field.desc,
-        items: field.values === undefined ? { type: 'string' } : { type: 'string', enum: field.values },
-      };
-    case 'number':
-      return { type: 'number', description: field.desc };
-    case 'boolean':
-      return { type: 'boolean', description: field.desc };
-    case 'object[]':
-      return { type: 'array', description: field.desc, items: { type: 'object' } };
-    default:
-      return { type: 'string', description: field.desc };
-  }
+  return fieldSchema(field);
 }
 
 /** 字段值是否包含对象结构；结构化字段用 JSON 代码块呈现，避免被压成一行。 */

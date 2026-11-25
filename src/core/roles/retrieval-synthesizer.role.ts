@@ -1,5 +1,6 @@
 import type { OutputShape, TaskShape, ToolKey } from '../types.js';
 import { SubagentRole } from '../role.js';
+import { EVIDENCE_CARD_FIELDS, SEED_LEDGER_FIELDS } from './shapes.js';
 
 /**
  * 检索综合员：只依据证据卡与验证意见回答议题，保留冲突与不确定性。
@@ -27,6 +28,7 @@ export class RetrievalSynthesizerRole extends SubagentRole {
       type: 'object[]',
       required: true,
       desc: '读者提交的证据卡，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
+      fields: EVIDENCE_CARD_FIELDS,
     },
     verificationNotes: {
       type: 'string[]',
@@ -35,6 +37,7 @@ export class RetrievalSynthesizerRole extends SubagentRole {
     seedLedger: {
       type: 'object[]',
       desc: '种子台账，每项含 docPath、initialRole、currentRole、evidenceRef、round、reason',
+      fields: SEED_LEDGER_FIELDS,
     },
   };
 

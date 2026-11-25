@@ -1,6 +1,6 @@
 import { compileRoster } from '../core/roster.js';
-import { propertyOf, renderTask, type Json } from '../core/render-task.js';
-import { toJsonSchema } from '../core/schema.js';
+import { renderTask, type Json } from '../core/render-task.js';
+import { objectSchema, toJsonSchema } from '../core/schema.js';
 import type { RoleSpec } from '../core/types.js';
 
 /**
@@ -43,16 +43,14 @@ function subagentServiceOf(ctx: Json): SubagentService {
 }
 
 function registerRole(ctx: Json, spec: RoleSpec): void {
-  const properties: Json = {};
-  const required: string[] = [];
-  for (const [field, def] of Object.entries(spec.task)) {
-    properties[field] = propertyOf(def);
-    if (def.required === true) required.push(field);
-  }
-  properties['extraNotes'] = {
-    type: 'string',
-    description: '可选：本次任务的额外背景或边界说明。不要复述角色的岗位说明。',
-  };
+  // 入参 schema 与 outputSchema 共用同一段映射，避免三处各写一遍对象节点。
+  const parameters = objectSchema({
+    ...spec.task,
+    extraNotes: {
+      type: 'string',
+      desc: '可选：本次任务的额外背景或边界说明。不要复述角色的岗位说明。',
+    },
+  });
 
   const tools = ctx['tools'] as { register(definition: Json): unknown };
 
@@ -64,12 +62,7 @@ function registerRole(ctx: Json, spec: RoleSpec): void {
       `\n任务字段：${Object.entries(spec.task)
         .map(([field, def]) => `${field}（${def.type}${def.required === true ? '，必填' : ''}）`)
         .join('、')}。`,
-    parameters: {
-      type: 'object',
-      properties,
-      required,
-      additionalProperties: false,
-    },
+    parameters,
     output: {
       schema: {
         type: 'object',

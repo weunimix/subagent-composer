@@ -1,5 +1,6 @@
 import type { OutputShape, TaskShape, ToolKey } from '../types.js';
 import { SubagentRole } from '../role.js';
+import { EVIDENCE_CARD_FIELDS, SEED_LEDGER_FIELDS } from './shapes.js';
 
 /**
  * 检索验证员：独立核对读者是否覆盖完整候选集、证据是否可回溯、冲突是否被记录。
@@ -32,10 +33,12 @@ export class RetrievalVerifierRole extends SubagentRole {
       type: 'object[]',
       required: true,
       desc: '读者提交的证据卡，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
+      fields: EVIDENCE_CARD_FIELDS,
     },
     seedLedger: {
       type: 'object[]',
       desc: '种子台账，每项含 docPath、initialRole、currentRole、evidenceRef、round、reason',
+      fields: SEED_LEDGER_FIELDS,
     },
   };
 

@@ -1,4 +1,4 @@
-import type { RoleSpec } from './types.js';
+import type { RoleSpec, TaskShape } from './types.js';
 
 export class SpecError extends Error {}
 
@@ -28,12 +28,8 @@ export function assertSpec(spec: RoleSpec): void {
   if (spec.persona.trim().length < 20) {
     throw new SpecError(`${where}: persona 太短，缺少身份描述`);
   }
-  for (const [name, field] of Object.entries(spec.task)) {
-    if (!field.desc.trim()) throw new SpecError(`${where}: 任务字段 ${name} 缺少 desc`);
-  }
-  for (const [name, field] of Object.entries(spec.output)) {
-    if (!field.desc.trim()) throw new SpecError(`${where}: 交付字段 ${name} 缺少 desc`);
-  }
+  assertFields(where, '任务', spec.task, '');
+  assertFields(where, '交付', spec.output, '');
   // 没有交付字段，父级就拿不到结构化结果，委派退化成散文。
   if (Object.keys(spec.output).length === 0) {
     throw new SpecError(`${where}: 至少要声明一个交付字段`);
@@ -46,5 +42,25 @@ export function assertRoster(specs: RoleSpec[]): void {
   for (const spec of specs) {
     if (seen.has(spec.id)) throw new SpecError(`重复的 role id: ${spec.id}`);
     seen.add(spec.id);
+  }
+}
+
+/**
+ * 字段集合检查，含 object[] 的嵌套子字段。
+ * 嵌套用点号路径报错（evidenceCards.docPath），便于定位是哪一层缺 desc。
+ */
+function assertFields(where: string, kind: string, fields: TaskShape, path: string): void {
+  for (const [name, field] of Object.entries(fields)) {
+    const at = `${path}${name}`;
+    if (!field.desc.trim()) throw new SpecError(`${where}: ${kind}字段 ${at} 缺少 desc`);
+    if (field.fields !== undefined) {
+      if (field.type !== 'object[]') {
+        throw new SpecError(`${where}: ${kind}字段 ${at} 声明了 fields，但类型是 ${field.type}；fields 只对 object[] 生效`);
+      }
+      if (Object.keys(field.fields).length === 0) {
+        throw new SpecError(`${where}: ${kind}字段 ${at} 的 fields 为空；要么删掉 fields，要么声明子字段`);
+      }
+      assertFields(where, kind, field.fields, `${at}.`);
+    }
   }
 }
