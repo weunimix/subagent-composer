@@ -1,66 +1,88 @@
 # subagent-composer
 
-把「角色定义」编译成 DSH（DeepSeek Harness）能装载的两样东西：
+把「角色定义」编译成两样东西，**同源、两种投影**：
 
-1. **agent preset 声明** —— 每个角色一条 preset（persona + 工具面），被子 agent 继承；
-2. **派工单 schema** —— 每个角色的任务字段，供主 agent 结构化填写。
+1. **DSH agent preset**（`dist/cordis.patch.yml`）—— 每个角色一条 preset：persona + 工具面，子 agent 继承；
+2. **dsh_workflow 的 `agent()` 入参**（`toAgentCall` / `toAgentCallTemplate`）—— 同一份 persona 与任务单，交给 workflow 脚本派工。
 
-一句话：**角色写一次，向内变成子 agent 的身份，向外变成父 agent 能读的契约。**
+一句话：**角色写一次；向内是子 agent 的身份，向外是父 agent 能读的契约，向下是 workflow 能跑的任务入参。**
 
-## 为什么不是 pi 版那套
+## 为什么有两套
 
-pi 版的产物是 7 段 markdown（Identity / Should do / … / Output），只有「向内」的一面；
-主 agent 派工时仍然写散文。本仓库只保留一面身份、新增一面契约，并且删掉了产物格式层
-（frontmatter / 目录 / 命名）——DSH 里这些由 preset 声明与 Loader 承担。
+因为 DSH 0.2.2-rc.5 的 workflow 脚本层**不能按 preset 派工**（`agent()` 只认 `label/phase/schema/provider/model`）。
+所以人设必须随 prompt 走；也只有这样，gate、顺序、重试这些执行状态才能留在脚本里，而不是塞进角色定义。
+实测依据见 [docs/spike-dsh-workflow-2026-11.md](docs/spike-dsh-workflow-2026-11.md)，契约与边界见
+[docs/dsh-workflow-adapter.md](docs/dsh-workflow-adapter.md)，两条执行路径的取舍见
+[docs/delegate-vs-workflow.md](docs/delegate-vs-workflow.md)。
 
 ## 目录
 
 ```
 src/
-  kernel/            编译器内核（不依赖任何具体角色）
-    types.ts         RoleSpec / FieldSpec / ToolKey —— 派生物的契约
-    role.ts          作者侧 API：abstract class SubagentRole
-    render.ts        persona 唯一渲染入口
-    schema.ts        字段声明 → JSON Schema
-    emit.ts          角色 → preset 声明 / bundle patch
-    tools.ts         能力键 → DSH 工具行
-    discipline.ts    所有角色共享的委派纪律
-    validate.ts      build 期断言
-  roles/             具体角色（每个角色一个文件）
-  roster.ts          角色登记表：编译范围唯一来源
-  director.ts        导演 preset（主会话入口）
-  plugin/delegate.ts 派工单工具：schema 生成 + 在 preset scope 内注册 `delegate_*`
-  cli.ts             编译入口：roles/ → dist/
+  core/                 角色事实与纯编译（不 import 适配器，也不含执行状态）
+    types.ts            RoleSpec / FieldSpec / ToolKey —— 投影的契约
+    role.ts             作者侧 API：abstract class SubagentRole
+    render.ts           persona 唯一渲染入口（身份 / 纪律 / 步骤 / 交付字段）
+    render-task.ts      任务单渲染：按值（renderTask）与按占位符（renderTaskTemplate）
+    schema.ts           字段声明 → JSON Schema（含 object[] 的 items.properties）
+    discipline.ts       所有角色共享的委派纪律
+    validate.ts         build 期断言（含嵌套 fields 的递归校验）
+    roles/*.role.ts     具体角色，一个角色一个文件
+    roles/shapes.ts     跨角色复用的子字段形状（证据卡、种子台账）
+    roster.ts           角色登记表：编译范围唯一来源
+  adapters/
+    dsh-preset/         RoleSpec → DSH preset 投影（emit / tools / director）
+    dsh-workflow/       RoleSpec → agent(prompt, options) 投影（input.ts）
+  plugin/delegate.ts    旧派工工具（**已弃用**，见下）
+  cli.ts                编译入口：core/ → dist/
+scripts/
+  check-projections.mjs 投影一致性检查（同一份 RoleSpec → persona / schema / 模板 / 工具入参）
+  flows/                样例 workflow 脚本（编排只有在这里，角色事实不进来）
 ```
 
 ## 用法
 
 ```bash
 npm install
-npm run build       # 产出 dist/cordis.patch.yml 与 dist/roles.json
+npm run build              # 产出 dist/cordis.patch.yml 与 dist/roles.json
 npm run typecheck
+npm run check:projections  # 断言同一份角色事实驱动的多份投影没有漂移
 ```
 
-装进 DSH：
+装成 preset：
 
-本仓库是一个 DSH bundle（`package.json` 里的 `dsh.bundle.patch` 指向 `dist/cordis.patch.yml`）。装进本机 DSH 并开始使用：
+1. 用 DSH 插件管理器把**本仓库绝对路径**作为本地包装上（Agent 侧 `plugin_manager` 的 `install_bundle`）。
+2. 装好后不需要重启，bundle 的 patch 合入 profile，多出各角色 preset 行。
+3. 新会话里选预设 `调度者`（id `subagent-director`）。
 
-1. 用 DSH 的插件管理器把**包含本仓库的绝对路径**作为本地包装上（Agent 侧对应 `plugin_manager` 的 `install_bundle`，`target` 填仓库目录）。
-2. 装好后**不需要重启**：bundle 的 patch 会合入 profile，多出各角色 preset 行与 `include:preset-subagent-director`。
-3. 新开一个会话，在 Agent 预设里选择 `调度者`（id `subagent-director`），它会把活派给对应角色的子 agent（当前有 `节点审查` / `novel-audit`，以及 `检索阅读员`、`检索验证员`、`检索综合员`）。
+跑 workflow 路径：
+
+```js
+import { toAgentCall, toAgentCallTemplate } from 'subagent-composer';
+```
+
+拿到的 `{ prompt, options }` 直接喂给 workflow 脚本里的 `agent(prompt, options)`；链式场景先用
+`toAgentCallTemplate` 出带 `<<字段名>>` 占位符的 prompt，运行期再填。完整样例见
+`scripts/flows/retrieval-audit.mjs`（`node -e "import('./scripts/flows/retrieval-audit.mjs')"` 可看它导出的 `meta` / `source` / `buildArgs`）。
 
 两条约束：
 
-- 不要手改 profile 的 `package.json` / `cordis.patch.yml`，也不要往 profile 里跑包管理器——profile 的依赖与 patch 层由插件管理器维护；profile 放在哪个目录由 DSH 按平台决定，不需要手工定位。
-- `dist/` 必须随包发布，所以 `package.json` 里有 `"files": ["dist"]`。缺了它，本地包会因 `.gitignore` 忽略 `dist/` 而被裁掉产物，安装时报 `ENOENT .../dist/cordis.patch.yml`。
+- 不要手改 profile 的 `package.json` / `cordis.patch.yml`，也不要往 profile 里跑包管理器——profile 的依赖与 patch 层由插件管理器维护。
+- `dist/` 必须随包发布，所以 `package.json` 里有 `"files": ["dist"]`；缺了它本地包会因为 `.gitignore` 忽略 `dist/` 而被裁掉产物。
+
+## delegate_* 已弃用
+
+`delegate_<角色>` 工具（`src/plugin/delegate.ts`）自 **0.2.0 起弃用，0.3.0 移除**。它仍然注册、仍然能挂进 preset，原因只是让已经挂在老 preset 里的会话不至于当场断掉——**不要在新代码里依赖它**。
+
+弃用的直接原因：它把 `prompt/parent/agentPreset/outputSchema` 放在嵌套的 `request` 里，而 subagent seam 的契约是平铺字段，所以在本机 rc.5 上拿不到 prompt（实测输出与复现命令见 [docs/delegate-vs-workflow.md](docs/delegate-vs-workflow.md)）。要复活它，第一步是把调用改平，而不是加参数。
+
+替代路径是 workflow：`toAgentCall` / `toAgentCallTemplate` + `scripts/flows/*.mjs`。
 
 ## 状态
 
 - M0 编译器骨架：完成（角色 → preset 声明）。
-- M1 装配验证：完成（DSH 0.2.2-rc.1 实测）。`plugin/delegate.ts` 在 preset scope 内注册
-  `delegate_*` 工具，参数与输出 schema 均通过宿主的 `assertSupportedJsonSchema`；
-  派工请求为 `provider: spawn` + `agentPreset: <角色 id>` + `outputSchema`。
-  未跑的只有端到端一项：真实子会话需要新开会话并选 `调度者` 预设。
-- M2 迁移既有角色 / M3 收编 workflow-composer：未开始。
+- M1 装配验证：完成（DSH 0.2.2-rc.1 实测）。
+- 0.2.0（需求 REQ-2026-001）：抽 `src/core` 与 `adapters/`，`object[]` 支持嵌套 `items.properties`，新增 workflow 投影与 `check:projections`，最小 flow 真实跑通（reader → verifier gate → synthesizer），delegate 路径弃用。
+- 0.3.0 待办：移除 `plugin/delegate.ts`；`调度者` preset 的派工工具换成 workflow；`dist/roles.json` 去留裁决；结论见 [docs/architecture-ssot.md](docs/architecture-ssot.md) 的「已知缺口」。
 
 架构与单一事实来源见 [docs/architecture-ssot.md](docs/architecture-ssot.md)。

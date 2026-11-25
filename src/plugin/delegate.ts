@@ -6,9 +6,16 @@ import type { RoleSpec } from '../core/types.js';
 /**
  * cordis 插件：给导演装一排「按角色定制」的委派工具。
  *
- * 为什么不用内置 subagent：它的 `agent_preset` 只是一个可省略的枚举参数，
+ * @deprecated 0.2.0 起弃用，0.3.0 移除。派工走 workflow 路径：
+ * `toAgentCall` / `toAgentCallTemplate`（见 docs/dsh-workflow-adapter.md）。
+ * 保留一个兼容周期的原因只有一个：已经挂在 preset 里的老会话不至于当场断掉。
+ * 但不要在新代码里依赖它——它还带着一个形状缺陷（prompt/parent 放在嵌套
+ * `request` 里，而 seam 契约是平铺的），已在 docs/delegate-vs-workflow.md
+ * 记录在案；要复活这条路径，第一步是把调用改平，而不是加参数。
+ *
+ * 为什么当初不用内置 subagent：它的 `agent_preset` 只是一个可省略的枚举参数，
  * 模型一旦省略，子级就静默继承父级 preset —— 身份没了，父级也看不出来。
- * 这里的每个工具都把 `agentPreset` 写死成角色 id，模型没有省略的余地。
+ * 这里的每个工具把 `agentPreset` 写死成角色 id，模型没有省略的余地。
  *
  * 依赖：`tools` 与 `subagents` 都在 inject 里声明（cordis 的 ctx 代理会拒绝
  * 访问未声明的服务名）。`subagents` 来自宿主，和内置 tool-subagent 同源，
@@ -100,7 +107,24 @@ function registerRole(ctx: Json, spec: RoleSpec): void {
   });
 }
 
+let deprecatedNotified = false;
+
+/**
+ * 弃用提示只打一次：这个插件是按 preset 挂载的，挂多了会把日志刷满。
+ * 提示里给出替代路径与移除版本，别只写「已弃用」。
+ */
+function notifyDeprecated(): void {
+  if (deprecatedNotified) return;
+  deprecatedNotified = true;
+  console.warn(
+    '[subagent-composer] delegate_* 工具已弃用（0.2.0），将在 0.3.0 移除；' +
+      '派工请改用 workflow 路径（toAgentCall / toAgentCallTemplate），' +
+      '见 docs/delegate-vs-workflow.md。',
+  );
+}
+
 /** cordis 入口：preset 挂上本插件后，roster 里的每个角色得到一个工具。 */
 export function apply(ctx: Json): void {
+  notifyDeprecated();
   for (const spec of compileRoster()) registerRole(ctx, spec);
 }

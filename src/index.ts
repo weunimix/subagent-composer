@@ -17,4 +17,5 @@ export type {
   WorkflowAgentOverrides,
   WorkflowAgentTemplate,
 } from './adapters/dsh-workflow/input.js';
+/** @deprecated 0.2.0 起弃用，0.3.0 移除；派工改用 toAgentCall / toAgentCallTemplate。 */
 export { toolNameOf } from './plugin/delegate.js';
