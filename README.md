@@ -11,7 +11,7 @@
 
 因为 DSH 0.2.2-rc.5 的 workflow 脚本层**不能按 preset 派工**（`agent()` 只认 `label/phase/schema/provider/model`）。
 所以人设必须随 prompt 走；也只有这样，gate、顺序、重试这些执行状态才能留在脚本里，而不是塞进角色定义。
-实测依据见 [docs/spike-dsh-workflow-2026-11.md](docs/spike-dsh-workflow-2026-11.md)，契约与边界见
+实测依据见 [docs/feasibility-dsh-workflow.md](docs/feasibility-dsh-workflow.md)，契约与边界见
 [docs/dsh-workflow-adapter.md](docs/dsh-workflow-adapter.md)，两条执行路径的取舍见
 [docs/delegate-vs-workflow.md](docs/delegate-vs-workflow.md)。
 

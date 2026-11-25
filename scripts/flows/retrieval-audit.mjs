@@ -190,14 +190,14 @@ export function buildArgs(overrides = {}) {
       '执行状态、派工顺序、失败语义应外移到 dsh_workflow；本仓库只保留角色事实与它的两份投影。',
     docPaths: [
       'docs/plan-dsh-workflow.md',
-      'docs/spike-dsh-workflow-2026-11.md',
+      'docs/feasibility-dsh-workflow.md',
       'docs/dsh-workflow-adapter.md',
       'docs/architecture-ssot.md',
       'AGENTS.md',
     ],
     candidatePaths: [
       'docs/plan-dsh-workflow.md',
-      'docs/spike-dsh-workflow-2026-11.md',
+      'docs/feasibility-dsh-workflow.md',
       'docs/dsh-workflow-adapter.md',
       'docs/architecture-ssot.md',
       'AGENTS.md',

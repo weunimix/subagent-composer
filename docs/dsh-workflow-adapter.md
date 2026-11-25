@@ -1,6 +1,6 @@
 # dsh_workflow 适配器：契约与边界
 
-阶段 2 产物。对应需求 REQ-2026-001 / 功能点 p2，结论依据阶段 0 spike（`docs/spike-dsh-workflow-2026-11.md`）。
+阶段 2 产物。对应需求 REQ-2026-001 / 功能点 p2，结论依据阶段 0 spike（`docs/feasibility-dsh-workflow.md`）。
 
 ## 一句话
 
