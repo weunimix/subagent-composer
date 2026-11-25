@@ -31,7 +31,7 @@ export class RetrievalVerifierRole extends SubagentRole {
     evidenceCards: {
       type: 'object[]',
       required: true,
-      desc: '读者提交的证据卡，每项含 docPath、section、claim、quote、relation、confidence',
+      desc: '读者提交的证据卡，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
     },
     seedLedger: {
       type: 'object[]',
@@ -53,6 +53,14 @@ export class RetrievalVerifierRole extends SubagentRole {
     unsupportedClaims: {
       type: 'string[]',
       desc: '证据卡中没有原文支撑、引用与原文不一致、或量化复算不成立的主张',
+    },
+    negativeClaims: {
+      type: 'object[]',
+      desc: '否定性或全称结论的覆盖度核对，每项含 claim、readCount、scannedCount、denominator、retrievalExpression、status',
+    },
+    assertionChecks: {
+      type: 'object[]',
+      desc: '量化断言的独立复算，每项含 claim、retrievalExpression、observedCount、expectedCount、passed',
     },
     conflicts: {
       type: 'object[]',
@@ -77,7 +85,8 @@ export class RetrievalVerifierRole extends SubagentRole {
     return [
       '只依据 candidatePaths、evidenceCards 与 seedLedger 核对，不引入外部材料。',
       '证据卡与原文不一致时以原文为准；无法回原文核对的引用标为无法核验。',
-      '遇到“唯一、全部、首次、共 N 处、只有”等量化或穷尽性断言时，必须回到 candidatePaths 逐项复算，不能只核对引用。',
+      '遇到“唯一、全部、首次、共 N 处、只有”等量化或穷尽性断言时，必须回到 candidatePaths 逐项复算，不能只核对引用；每条断言必须附可复现的检索式或文件清单。',
+      '遇到“scope 内没有、没有任何、零命中”等否定性结论时，必须核对已读篇数、扫描篇数、分母和检索式；缺覆盖度的结论写入 unsupportedClaims 或 negativeClaims，不能放行。',
       '不修改文件，不替综合者写答案。',
     ];
   }
@@ -85,9 +94,10 @@ export class RetrievalVerifierRole extends SubagentRole {
   steps(): string[] {
     return [
       '读 issueBrief、focusStatement 与 candidatePaths，建立本轮完整性分母。',
-      '逐条核对 evidenceCards 的 docPath、section、quote 是否可回溯，记录无支撑主张。',
+      '逐条核对 evidenceCards 的 docPath、evidenceRef、section、quote 是否可回溯，记录无支撑主张。',
       '检查 candidatePaths 是否都有对应证据卡，列出 missingDocs。',
-      '复算所有量化与穷尽性断言：按 candidatePaths 统计，复算不成立的写入 unsupportedClaims。',
+      '复算所有量化与穷尽性断言，检查每条断言的检索式；结果写入 assertionChecks，不成立写入 unsupportedClaims。',
+      '核对否定性结论的覆盖度，写入 negativeClaims。',
       '检查 seedLedger 的轮次与理由，记录 seedIssues；给出 verdict 与 summary。',
     ];
   }

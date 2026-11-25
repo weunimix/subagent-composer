@@ -42,12 +42,16 @@ export class RetrievalReaderRole extends SubagentRole {
     evidenceCards: {
       type: 'object[]',
       required: true,
-      desc: '证据卡列表，每项含 docPath、section、claim、quote、relation、confidence',
+      desc: '证据卡列表，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
     },
     coverage: {
       type: 'string[]',
       required: true,
       desc: '已读文档路径；必须覆盖 docPaths 全部条目',
+    },
+    boundaryNotes: {
+      type: 'string[]',
+      desc: '阅读中遇到的 scope 外文件及其处理方式；这些文件不产出证据卡',
     },
     questions: {
       type: 'string[]',
@@ -67,7 +71,9 @@ export class RetrievalReaderRole extends SubagentRole {
   extraDiscipline(): string[] {
     return [
       '必须读完 docPaths 的全部文档；漏读的文档写进 questions，不能静默跳过。',
+      '只读 docPaths 指定的文档；读到 scope 外文件时写入 boundaryNotes，不产出证据卡，不进入综合。',
       '只记录原文支持的内容：claim 与 quote 必须来自所读文档，推断要标 relation 为推断并说明依据。',
+      '证据位置必须使用 path:L15-L17 形式的行区间，不写无行号的概述。',
       '不修改文件，不替规划者决定议题中心；对中心的异议写进 summary 或 questions。',
     ];
   }
@@ -75,9 +81,10 @@ export class RetrievalReaderRole extends SubagentRole {
   steps(): string[] {
     return [
       '读 issueBrief 与 focusStatement，确认本轮要回答什么、中心是什么。',
-      '逐篇阅读 docPaths 指向的全文，按章节记录与议题相关的原文。',
+      '逐篇阅读 docPaths 指向的全文，按章节记录与议题相关的原文和行区间。',
       '把原文整理成证据卡，标注它与中心的关系：支持、削弱、无关、冲突或推断。',
-      '核对 coverage 是否覆盖全部 docPaths，提交证据卡与未决问题。',
+      '核对 coverage 是否覆盖全部 docPaths；把 scope 外文件写入 boundaryNotes。',
+      '提交证据卡、覆盖情况、边界记录与未决问题。',
     ];
   }
 }
