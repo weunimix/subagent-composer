@@ -1,51 +1,72 @@
-import { fieldSchema } from './schema.js';
-import type { FieldSpec, RoleSpec } from './types.js';
+import type { FieldType, RoleSpec } from './types.js';
 
 export type Json = Record<string, unknown>;
-
-/**
- * 字段声明 → JSON Schema 属性节点。
- * 与 outputSchema 共用同一段映射：delegate 入参和结构化交付不会各写一份。
- */
-export function propertyOf(field: FieldSpec): Json {
-  return fieldSchema(field);
-}
-
-/** 字段值是否包含对象结构；结构化字段用 JSON 代码块呈现，避免被压成一行。 */
-export function isStructured(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some((item) => item !== null && typeof item === 'object');
-  }
-  return value !== null && typeof value === 'object';
-}
-
-/** 字段值渲染：对象与对象数组保留完整结构，字符串数组仍按中文顿号连接。 */
-export function renderFieldValue(value: unknown): string {
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '（空）';
-    if (value.some((item) => item !== null && typeof item === 'object')) {
-      return JSON.stringify(value, null, 2);
-    }
-    return value.map(String).join('、');
-  }
-  if (value !== null && typeof value === 'object') {
-    return JSON.stringify(value, null, 2);
-  }
-  return String(value ?? '');
-}
 
 /** 任务模板里的占位符：`<<字段名>>`。故意不用双花括号，避免与 DSH 模板变量混淆。 */
 export function slotToken(name: string): string {
   return `<<${name}>>`;
 }
 
+/** 占位符语法。填槽时用一次替换，替换文本不会被二次扫描。 */
+const SLOT_PATTERN = /<<([A-Za-z0-9_]+)>>/g;
+
+/**
+ * 渲染方式只由**字段声明**决定，不看运行期的值。
+ *
+ * 早先按值判断（对象就上代码块），模板按声明判断（object[] 上代码块），
+ * 两条路径在「对象数组为空」「string 字段收到对象」时输出不同，其中一种会把
+ * 对象印成 `[object Object]` 静默丢数据。现在只有这一份判据。
+ */
+function kindOf(type: FieldType): TaskSlot['kind'] {
+  return type === 'object[]' ? 'json' : 'text';
+}
+
+function typeName(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return '数组';
+  return typeof value;
+}
+
+/**
+ * 字段值渲染。类型与声明不符时直接抛错：宁可让派工失败，也不要把对象
+ * 悄悄压成 `[object Object]`。
+ */
+export function renderFieldValue(name: string, field: { type: FieldType }, value: unknown): string {
+  if (field.type === 'object[]') {
+    if (value === undefined || value === null) return JSON.stringify([], null, 2);
+    if (!Array.isArray(value)) {
+      throw new TypeError(`字段 ${name} 声明为 object[]，收到${typeName(value)}`);
+    }
+    return JSON.stringify(value, null, 2);
+  }
+  if (field.type === 'string[]') {
+    if (value === undefined || value === null) return '（空）';
+    if (!Array.isArray(value)) {
+      throw new TypeError(`字段 ${name} 声明为 string[]，收到${typeName(value)}`);
+    }
+    if (value.length === 0) return '（空）';
+    for (const item of value) {
+      if (item !== null && typeof item === 'object') {
+        throw new TypeError(`字段 ${name} 声明为 string[]，但数组里有${typeName(item)}`);
+      }
+    }
+    return value.map(String).join('、');
+  }
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') {
+    throw new TypeError(
+      `字段 ${name} 声明为 ${field.type}，收到${typeName(value)}；结构化数据要声明成 object[] 或 string[]`,
+    );
+  }
+  return String(value);
+}
+
 export interface TaskSlot {
   /** 任务字段名。 */
   name: string;
-  /**
-   * 替换方式：json = 上游结构化输出的 JSON 文本（会放进 ```json 代码块），
-   * text = 普通文本（字符串数组用中文顿号连接）。
-   */
+  /** 字段类型，填槽时据此校验值。 */
+  type: FieldType;
+  /** 渲染方式：json = JSON 代码块（object[]），text = 行内文本。 */
   kind: 'text' | 'json';
 }
 
@@ -67,12 +88,12 @@ interface RenderedField {
  */
 function renderBody(
   spec: RoleSpec,
-  renderField: (name: string, field: FieldSpec) => RenderedField,
+  renderField: (name: string, type: FieldType) => RenderedField,
   extraNotes?: string,
 ): string {
   const lines = [`# 任务：${spec.name}`, '', spec.when, '', '## 任务字段', ''];
   for (const [name, field] of Object.entries(spec.task)) {
-    const { text, structured } = renderField(name, field);
+    const { text, structured } = renderField(name, field.type);
     if (structured) {
       lines.push(`- ${name}：`, '', '```json', text, '```');
     } else {
@@ -91,10 +112,10 @@ export function renderTask(spec: RoleSpec, args: Record<string, unknown>): strin
   const extra = args.extraNotes;
   return renderBody(
     spec,
-    (name) => {
-      const value = args[name];
-      return { text: renderFieldValue(value), structured: isStructured(value) };
-    },
+    (name, type) => ({
+      text: renderFieldValue(name, { type }, args[name]),
+      structured: kindOf(type) === 'json',
+    }),
     typeof extra === 'string' && extra.trim() !== '' ? extra.trim() : undefined,
   );
 }
@@ -105,10 +126,34 @@ export function renderTask(spec: RoleSpec, args: Record<string, unknown>): strin
  */
 export function renderTaskTemplate(spec: RoleSpec): TaskTemplate {
   const slots: TaskSlot[] = [];
-  const text = renderBody(spec, (name, field) => {
-    const structured = field.type === 'object[]';
-    slots.push({ name, kind: structured ? 'json' : 'text' });
-    return { text: slotToken(name), structured };
+  const text = renderBody(spec, (name, type) => {
+    slots.push({ name, type, kind: kindOf(type) });
+    return { text: slotToken(name), structured: kindOf(type) === 'json' };
   });
   return { text, slots };
+}
+
+/**
+ * 按模板填槽。一次正则替换完成：替换进来的文本不会被当成占位符再扫一遍，
+ * 所以字段值里出现字面 `<<x>>` 不会打乱其它槽。
+ *
+ * 只认字符串 + 槽位，所以 persona 前缀（`toAgentCallTemplate` 的 promptTemplate）
+ * 也能用同一条规则填，不必为「整段 prompt」再写一份。
+ */
+export function fillSlots(
+  text: string,
+  slots: readonly TaskSlot[],
+  values: Record<string, unknown>,
+): string {
+  const byName = new Map(slots.map((slot) => [slot.name, slot]));
+  return text.replace(SLOT_PATTERN, (raw, name: string) => {
+    const slot = byName.get(name);
+    if (slot === undefined) throw new Error(`模板里出现未声明的占位符 ${raw}`);
+    return renderFieldValue(slot.name, { type: slot.type }, values[slot.name]);
+  });
+}
+
+/** 任务单模板填槽。 */
+export function fillTaskTemplate(template: TaskTemplate, values: Record<string, unknown>): string {
+  return fillSlots(template.text, template.slots, values);
 }

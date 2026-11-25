@@ -8,9 +8,9 @@ export type {
   ToolKey,
 } from './core/types.js';
 export { ROLE_CLASSES, compileRoster } from './core/roster.js';
-export { renderTask, renderTaskTemplate } from './core/render-task.js';
+export { fillSlots, fillTaskTemplate, renderTask, renderTaskTemplate, slotToken } from './core/render-task.js';
 export type { TaskSlot, TaskTemplate } from './core/render-task.js';
-export { toAgentCall, toAgentCallTemplate } from './adapters/dsh-workflow/input.js';
+export { fillAgentCallTemplate, toAgentCall, toAgentCallTemplate } from './adapters/dsh-workflow/input.js';
 export type {
   WorkflowAgentCall,
   WorkflowAgentOptions,

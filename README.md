@@ -62,8 +62,9 @@ import { toAgentCall, toAgentCallTemplate } from 'subagent-composer';
 ```
 
 拿到的 `{ prompt, options }` 直接喂给 workflow 脚本里的 `agent(prompt, options)`；链式场景先用
-`toAgentCallTemplate` 出带 `<<字段名>>` 占位符的 prompt，运行期再填。完整样例见
-`scripts/flows/retrieval-audit.mjs`（`node -e "import('./scripts/flows/retrieval-audit.mjs')"` 可看它导出的 `meta` / `source` / `buildArgs`）。
+`toAgentCallTemplate` 出带 `<<字段名>>` 占位符的 prompt，再用 `fillAgentCallTemplate(template, values)` 填
+（只做一次正则替换：字段值里出现字面 `<<x>>` 不会被当成占位符二次替换）。完整样例见
+`scripts/flows/retrieval-audit.mjs`：`node scripts/flows/retrieval-audit.mjs` 打印它导出的 `{ meta, source, args }`。
 
 两条约束：
 
@@ -72,7 +73,7 @@ import { toAgentCall, toAgentCallTemplate } from 'subagent-composer';
 
 ## delegate_* 已弃用
 
-`delegate_<角色>` 工具（`src/plugin/delegate.ts`）自 **0.2.0 起弃用，0.3.0 移除**。它仍然注册、仍然能挂进 preset，原因只是让已经挂在老 preset 里的会话不至于当场断掉——**不要在新代码里依赖它**。
+`delegate_<角色>` 工具（`src/plugin/delegate.ts`）自 **0.2.0 起弃用，0.3.0 移除**。它仍然注册（老 preset 里还写着本插件，删掉会让整个 preset 挂不上），但**调用会直接抛错**并指向迁移路径——静默失败比报错更糟。**不要在新代码里依赖它**。
 
 弃用的直接原因：它把 `prompt/parent/agentPreset/outputSchema` 放在嵌套的 `request` 里，而 subagent seam 的契约是平铺字段，所以在本机 rc.5 上拿不到 prompt（实测输出与复现命令见 [docs/delegate-vs-workflow.md](docs/delegate-vs-workflow.md)）。要复活它，第一步是把调用改平，而不是加参数。
 
@@ -83,6 +84,6 @@ import { toAgentCall, toAgentCallTemplate } from 'subagent-composer';
 - M0 编译器骨架：完成（角色 → preset 声明）。
 - M1 装配验证：完成（DSH 0.2.2-rc.1 实测）。
 - 0.2.0（需求 REQ-2026-001）：抽 `src/core` 与 `adapters/`，`object[]` 支持嵌套 `items.properties`，新增 workflow 投影与 `check:projections`，最小 flow 真实跑通（reader → verifier gate → synthesizer），delegate 路径弃用。
-- 0.3.0 待办：移除 `plugin/delegate.ts`；`调度者` preset 的派工工具换成 workflow；`dist/roles.json` 去留裁决；结论见 [docs/architecture-ssot.md](docs/architecture-ssot.md) 的「已知缺口」。
+- 0.3.0 待办：移除 `plugin/delegate.ts`，同时把 `package.json` 的 `main` / `exports` 从它移走（否则是断崖）；`调度者` preset 的派工工具换成 workflow；`dist/roles.json` 去留裁决。明细见 [docs/architecture-ssot.md](docs/architecture-ssot.md) 的「已知缺口」。
 
 架构与单一事实来源见 [docs/architecture-ssot.md](docs/architecture-ssot.md)。

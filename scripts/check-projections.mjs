@@ -17,7 +17,13 @@ import { join } from 'node:path';
 
 import YAML from 'yaml';
 
-import { compileRoster, renderTask, toAgentCall, toAgentCallTemplate } from '../dist/index.js';
+import {
+  compileRoster,
+  fillAgentCallTemplate,
+  renderTask,
+  toAgentCall,
+  toAgentCallTemplate,
+} from '../dist/index.js';
 import { apply as applyDelegate } from '../dist/plugin/delegate.js';
 
 const ROOT = process.cwd();
@@ -36,6 +42,18 @@ for (const spec of specs) {
   }
 
   const call = toAgentCall(spec, {});
+  // 脚本层只认这几个键：多写一个 `preset` 之类，宿主会直接拒绝整个 run（阶段 0 实测）。
+  const SUPPORTED_OPTION_KEYS = ['label', 'phase', 'provider', 'model', 'schema'];
+  const extraKeys = Object.keys(call.options).filter((key) => !SUPPORTED_OPTION_KEYS.includes(key));
+  if (extraKeys.length > 0) {
+    fail(`${spec.id}: agent() options 里出现了脚本层不认识的键 [${extraKeys.join(', ')}]`);
+  }
+  // 运行期传进来的野键（TS 拦不住 JS 调用方）不能漏进 options。
+  const wild = toAgentCall(spec, {}, { preset: 'retrieval-verifier', readonly: true });
+  const wildKeys = Object.keys(wild.options).filter((key) => !SUPPORTED_OPTION_KEYS.includes(key));
+  if (wildKeys.length > 0) {
+    fail(`${spec.id}: 未声明的 override 键漏进了 options [${wildKeys.join(', ')}]`);
+  }
   const properties = call.options.schema.properties ?? {};
 
   for (const [name, field] of Object.entries(spec.output)) {
@@ -68,7 +86,9 @@ for (const spec of specs) {
         }
       }
       for (const sub of Object.keys(field.fields)) {
-        if (!field.desc.includes(sub)) {
+        // 按独立词匹配：`docPath` 不能因为包含 `path` 就把新增的 path 子字段糊过去。
+        const asToken = new RegExp(`(^|[^A-Za-z0-9_])${sub}([^A-Za-z0-9_]|$)`);
+        if (!asToken.test(field.desc)) {
           fail(`${spec.id}.${name}: 父字段 desc 没有提到子字段 ${sub}，散文与声明已经漂移`);
         }
       }
@@ -94,7 +114,8 @@ for (const spec of specs) {
   }
 }
 
-// 6. 模板与派工单同构：填回占位符后必须等于 renderTask 的产物。
+// 6. 模板与派工单同构：用 core 的同一段填槽规则填回，必须等于 renderTask 的产物。
+//    三种输入都覆盖：常规值、空对象数组、字段值里带字面 <<占位符>>。
 const sampleValue = (field) => {
   switch (field.type) {
     case 'string':
@@ -111,39 +132,67 @@ const sampleValue = (field) => {
       return '';
   }
 };
-// 脚本侧的唯一一份替换规则：json 走 JSON.stringify，text 用顿号连接。
-const fillSlots = (template, values) =>
-  template.slots.reduce((prompt, slot) => {
-    const value = values[slot.name];
-    const text =
-      slot.kind === 'json'
-        ? JSON.stringify(value ?? [], null, 2)
-        : Array.isArray(value)
-          ? value.map(String).join('、')
-          : String(value ?? '');
-    return prompt.replace(`<<${slot.name}>>`, text);
-  }, template.promptTemplate);
+
+/** 空对象数组 / 值里带占位符字面量，都是「按值渲染」与「先出模板再填」最容易分叉的输入。 */
+const edgeArgs = (spec, makeValue) =>
+  Object.fromEntries(
+    Object.entries(spec.task).map(([name, field]) => [
+      name,
+      field.type === 'object[]' ? makeValue(field) : sampleValue(field),
+    ]),
+  );
 
 for (const spec of specs) {
-  const sampleArgs = Object.fromEntries(
-    Object.entries(spec.task).map(([name, field]) => [name, sampleValue(field)]),
-  );
-  const expected = `${spec.persona}\n\n${renderTask(spec, sampleArgs)}`;
   const template = toAgentCallTemplate(spec);
   const slotNames = template.slots.map((slot) => slot.name);
   if (JSON.stringify(slotNames) !== JSON.stringify(Object.keys(spec.task))) {
     fail(`${spec.id}: 模板占位符 [${slotNames.join(', ')}] 与任务字段不一致`);
   }
   for (const slot of template.slots) {
-    const structured = spec.task[slot.name]?.type === 'object[]';
-    if ((slot.kind === 'json') !== structured) {
-      fail(`${spec.id}.${slot.name}: 占位符类型应为 ${structured ? 'json' : 'text'}`);
+    const expectedKind = spec.task[slot.name]?.type === 'object[]' ? 'json' : 'text';
+    if (slot.kind !== expectedKind) {
+      fail(`${spec.id}.${slot.name}: 占位符类型应为 ${expectedKind}`);
     }
   }
-  const filled = fillSlots(template, sampleArgs);
-  if (filled !== expected) {
-    const at = [...filled].findIndex((ch, i) => ch !== expected[i]);
-    fail(`${spec.id}: 模板填回后与 renderTask 不一致（首个差异在第 ${at + 1} 个字符）`);
+
+  const variants = [
+    ['常规值', Object.fromEntries(Object.entries(spec.task).map(([name, field]) => [name, sampleValue(field)]))],
+    ['空对象数组', edgeArgs(spec, () => [])],
+    ['值里带占位符字面量', edgeArgs(spec, (field) => {
+      const card = sampleValue(field);
+      const first = Object.keys(field.fields ?? {})[0];
+      if (first !== undefined) card[0][first] = '见 <<seedLedger>> 的字面量';
+      return card;
+    })],
+  ];
+
+  for (const [label, args] of variants) {
+    const expected = `${spec.persona}\n\n${renderTask(spec, args)}`;
+    const filled = fillAgentCallTemplate(template, args);
+    if (filled !== expected) {
+      const at = [...filled].findIndex((ch, i) => ch !== expected[i]);
+      fail(`${spec.id}: 模板填回后与 renderTask 不一致（${label}，首个差异在第 ${at + 1} 个字符）`);
+    }
+  }
+}
+
+// 7. 只读角色的机械约束：patch 里的 fs 行必须关掉 write / edit（persona 之外的第二道）。
+for (const spec of specs) {
+  const row = patchRows.find((candidate) => candidate.id === `preset-${spec.id}`);
+  if (!row) continue;
+  const fsRow = (row.config?.plugins ?? []).find((plugin) => plugin.id === 'fs');
+  if (fsRow === undefined) continue;
+  const wantReadOnly = spec.readOnly === true;
+  if (wantReadOnly && (fsRow.config?.write !== false || fsRow.config?.edit !== false)) {
+    fail(`${spec.id}: 只读角色的 fs 行必须 write:false / edit:false`);
+  }
+  if (!wantReadOnly && (fsRow.config?.write === false || fsRow.config?.edit === false)) {
+    fail(`${spec.id}: 可写角色的 fs 行不应关闭 write / edit`);
+  }
+  // 工具行必须与 role.tools 一一对应且顺序一致（工具面也是投影，不是手写）。
+  const toolIds = (row.config?.plugins ?? []).filter((plugin) => plugin.id !== 'persona').map((plugin) => plugin.id);
+  if (JSON.stringify(toolIds) !== JSON.stringify(spec.tools)) {
+    fail(`${spec.id}: patch 工具行 [${toolIds.join(', ')}] 与 role.tools [${spec.tools.join(', ')}] 不一致`);
   }
 }
 

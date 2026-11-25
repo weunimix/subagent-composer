@@ -9,8 +9,8 @@ import { compileRoster } from './core/roster.js';
 /**
  * 编译入口：roles/ → dist/。
  *
- * dist/roles.json 是运行期事实（delegate 工具据此生成 schema），
  * dist/cordis.patch.yml 是装载期事实（bundle patch）。
+ * dist/roles.json 是给人看的结构快照；运行期 schema 由编译产物现算，不读这个文件。
  * 两者来自同一次 compile，不允许各自手写。
  */
 const OUT_DIR = join(process.cwd(), 'dist');

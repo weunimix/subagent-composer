@@ -38,22 +38,43 @@ var steps = args.steps;
 var context = args.context;
 var maxAttempts = args.maxAttempts || 2;
 
+// 一次正则替换：替换进来的文本不会再被扫描，所以字段值里出现字面 <<x>> 不会打乱别的槽。
+var SLOT = /<<([A-Za-z0-9_]+)>>/g;
+
 function fill(step, values) {
-  var prompt = step.promptTemplate;
-  for (var i = 0; i < step.slots.length; i += 1) {
-    var slot = step.slots[i];
-    var value = values[slot.name];
-    var text;
+  var byName = {};
+  for (var i = 0; i < step.slots.length; i += 1) byName[step.slots[i].name] = step.slots[i];
+  return step.promptTemplate.replace(SLOT, function (raw, name) {
+    var slot = byName[name];
+    if (slot === undefined) throw new Error('模板里出现未声明的占位符 ' + raw);
+    var value = values[name];
     if (slot.kind === 'json') {
-      text = JSON.stringify(value == null ? [] : value, null, 2);
-    } else if (Array.isArray(value)) {
-      text = value.map(String).join('、');
-    } else {
-      text = String(value == null ? '' : value);
+      if (value === undefined || value === null) return JSON.stringify([], null, 2);
+      if (!Array.isArray(value)) throw new Error(name + '：声明为 object[]，收到非数组');
+      return JSON.stringify(value, null, 2);
     }
-    prompt = prompt.replace('<<' + slot.name + '>>', text);
+    if (slot.type === 'string[]') {
+      if (value === undefined || value === null) return '（空）';
+      if (!Array.isArray(value)) throw new Error(name + '：声明为 string[]，收到非数组');
+      return value.length === 0 ? '（空）' : value.map(String).join('、');
+    }
+    if (value === undefined || value === null) return '';
+    if (typeof value === 'object') throw new Error(name + '：声明为 ' + slot.type + '，收到对象');
+    return String(value);
+  });
+}
+
+/** 模板本身是否还留着自己没声明的占位符——只校验模板，不校验填好的 prompt。 */
+function templateProblems(step, label) {
+  var known = {};
+  for (var i = 0; i < step.slots.length; i += 1) known[step.slots[i].name] = true;
+  var problems = [];
+  var match;
+  var pattern = new RegExp(SLOT.source, 'g');
+  while ((match = pattern.exec(step.promptTemplate)) !== null) {
+    if (known[match[1]] !== true) problems.push(match[1]);
   }
-  return prompt;
+  if (problems.length > 0) throw new Error(label + '：模板里有未声明的占位符 ' + problems.join(', '));
 }
 
 function valuesFor(extra) {
@@ -65,10 +86,8 @@ function valuesFor(extra) {
 }
 
 async function run(step, values, label) {
+  templateProblems(step, label);
   var prompt = fill(step, values);
-  if (prompt.indexOf('<<') !== -1) {
-    throw new Error(label + '：prompt 里还有没填的占位符');
-  }
   for (var attempt = 1; attempt <= maxAttempts; attempt += 1) {
     var out = await agent(prompt, step.options);
     if (out != null) return { out: out, attempts: attempt };

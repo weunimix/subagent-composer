@@ -1,4 +1,10 @@
-import { renderTask, renderTaskTemplate, type Json, type TaskSlot } from '../../core/render-task.js';
+import {
+  fillSlots,
+  renderTask,
+  renderTaskTemplate,
+  type Json,
+  type TaskSlot,
+} from '../../core/render-task.js';
 import { toJsonSchema } from '../../core/schema.js';
 import type { RoleSpec } from '../../core/types.js';
 
@@ -94,4 +100,16 @@ export function toAgentCallTemplate(
     slots: template.slots,
     options,
   };
+}
+
+/**
+ * 把上游输出填进模板，得到与 `toAgentCall` 同形状的 prompt。
+ * 与 core 的 fillTaskTemplate 共用一条填槽规则（含「值里带 <<x>> 不被二次替换」），
+ * 这里只是把 persona 前缀也一起填掉。
+ */
+export function fillAgentCallTemplate(
+  template: WorkflowAgentTemplate,
+  values: Record<string, unknown>,
+): string {
+  return fillSlots(template.promptTemplate, template.slots, values);
 }

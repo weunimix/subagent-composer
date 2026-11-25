@@ -8,7 +8,7 @@ import { renderPersona } from './render.js';
  * 事实的所有权：
  *   id / name / when / order / tools / task / output   → 本类字段
  *   persona 文本                                        → identity + discipline + steps 的渲染结果
- * 派生（emit）由 kernel 负责，子类不得自己拼 YAML 或 schema。
+ * 派生（emit / schema / workflow 入参）由 adapters 负责，子类不得自己拼 YAML 或 schema。
  */
 export abstract class SubagentRole {
   abstract readonly id: string;

@@ -39,6 +39,7 @@ adapters/dsh-workflow/input ← 角色 → agent(prompt, options) 投影
 | 导演人设 | `adapters/dsh-preset/director.ts` | 导演 preset 的 persona | 适配器 |
 | 任务单措辞 | `core/render-task.ts::renderBody` | `renderTask`（按值）与 `renderTaskTemplate`（按占位符） | 内核 |
 | workflow 入参 | `adapters/dsh-workflow/input.ts` | `toAgentCall` / `toAgentCallTemplate` 的 `{prompt, options}` | 适配器 |
+| 占位符填槽规则 | `core/render-task.ts::fillSlots` | `fillTaskTemplate`、`fillAgentCallTemplate`、flow 脚本里的一小段同规则实现（guest 边界） | 内核 |
 | 执行状态（顺序/重试/gate） | **本仓库不持有** | 调用方的 workflow 脚本 | 不属于本仓库 |
 | 产物（patch/json/plugin） | build | DSH Loader / delegate 工具 | 无人（禁止手改） |
 | 安装状态 | 外部（profile） | — | 不属于本仓库 |
@@ -48,8 +49,8 @@ adapters/dsh-workflow/input ← 角色 → agent(prompt, options) 投影
 1. **一个角色 = 一条 preset**，id 为 `<role.id>`；patch 行 id 为 `preset-<role.id>`。
 2. **rename 只发生在 id 上**：显示名只进 `config.name`，不参与路由。
 3. **persona 文本 = identity + 纪律 + 步骤 + 交付字段**，四段各自一次，不允许角色再追加重复段落。
-4. **同一事实不出现在两处**：`when` 只进 preset description，不进 persona；`output` 字段说明只进 persona「交付字段」与 schema；`object[]` 的子字段只声明一次（`fields`），父字段 desc 只做一句概述。
-5. **任务单只有一段措辞**：`renderTask` 与 `renderTaskTemplate` 共用 `renderBody`；填回占位符后必须与按值渲染逐字节相等（`check:projections` 断言）。
+4. **同一事实不出现在两处**：`when` 只进 preset description 与任务单标题，不进 persona；`output` 字段说明只进 persona「交付字段」与 schema；`object[]` 的子字段只声明一次（`fields`），父字段 desc 只做一句概述。
+5. **任务单只有一段措辞**：`renderTask` 与 `renderTaskTemplate` 共用 `renderBody`，且「是否结构化」只由字段声明决定（不看运行期的值）。填回占位符后必须与按值渲染逐字节相等——常规值、空对象数组、值里带字面 `<<x>>` 三种输入都由 `check:projections` 断言；类型与声明不符时两条路径都抛错，不会把对象印成 `[object Object]`。
 6. **同一字段 desc 同时出现在 persona 与 outputSchema**：`check:projections` 逐字段比对；`object[]` 声明了 `fields` 时，父字段 desc 还必须提到每个子字段名——防止散文副本悄悄漂移。
 7. **build 幂等**：同一份源码两次 build，`dist/` 字节一致。
 8. **patch 文件带 GENERATED 头**，回读结果必须与 `RoleSpec.persona` 逐字节相等（YAML 块标量）。
@@ -66,16 +67,16 @@ adapters/dsh-workflow/input ← 角色 → agent(prompt, options) 投影
 | `@displayName` 与 `@agentName` 二义 | 只有 `id`（路由用）与 `name`（给人看） |
 | frontmatter / 目录 / 文件命名由编译器约定 | 全部消失：preset 声明由 DSH 承担 |
 | 「何时调用」靠长提示词教 | `when` → preset `description` |
-| 字段 → JSON Schema 的映射在 delegate 与 preset 各写一份 | 只有 `core/schema.ts` 一处；`propertyOf` 直接委派 |
+| 字段 → JSON Schema 的映射在 delegate 与 preset 各写一份 | 只有 `core/schema.ts` 一处（`objectSchema` / `fieldSchema`） |
 | 任务单在 delegate 里渲染、workflow 里再拼一遍 | 只有 `core/render-task.ts`；workflow 侧是同一段措辞的占位符版本 |
 | 子字段形状在每个角色里各写一份 | `core/roles/shapes.ts` |
 | 内核混着具体角色（`src/kernel` + `src/roles` + `src/roster.ts`） | `core/` 主体只依赖 `types.ts`；角色只在 `core/roles/` |
 
 ## 五、已知缺口
 
-1. **`dist/` 与源码的一致性仍是约定**：没有 CI 断言「build 后工作区干净」。建议 CI 跑 `npm run typecheck && npm run build && npm run check:projections && git diff --exit-code dist/`。
+1. **`dist/` 与源码的一致性仍是约定**：没有 CI 断言。`dist/` 在 `.gitignore` 里，`git diff --exit-code dist/` 永远是空的，靠不住；建议 CI 跑一次 `npm run typecheck && npm run build && npm run check:projections`，再 `npm run build` 一次比 `dist/*` 的哈希（幂等才是可靠信号）。
 2. **`dist/roles.json` 无人读取**：0.2.0 保留（裁决：留一个版本观察，0.3.0 再决定删或加版本号）；它现在是唯一带 `fields` 结构的快照，删前要确认没有工具在读。
-3. **delegate 路径弃用中**：`delegate_<id>` 仍然注册，但调用形状与 seam 契约不一致（嵌套 `request`），在本机 rc.5 不可用；0.3.0 移除。工具名曾是外部契约，弃用期内不改名。
+3. **delegate 路径弃用中**：`delegate_<id>` 仍然注册（保老 preset 装载），但 `execute` 直接抛错并指向 workflow 路径——它把 `prompt/parent/agentPreset` 放在嵌套 `request` 里，与 seam 的平铺契约不符。0.3.0 移除时 `package.json` 的 `main` / `exports` 也要一起改。工具名曾是外部契约，弃用期内不改名。
 4. **workflow 路径权限面变宽**：子 agent 继承父级 preset，只读角色在 workflow 里仍可能写文件。要收紧只能在 preset 层做，或者等宿主支持按任务收权。
 5. **没有 usage 台账**：脚本层与 seam 都不返回单次 token 用量，成本只能外部估算。
 6. **run 不持久化**：`workflow_manage runs` 返回空数组，真实运行只有 meta.name 与返回体可作凭证，卡上留不下可点开的 runId。

@@ -23,7 +23,7 @@ export interface FieldSpec {
 export type TaskShape = Record<string, FieldSpec>;
 export type OutputShape = Record<string, FieldSpec>;
 
-/** 工具能力键。key → DSH tool 行 的映射由 kernel/tools.ts 拥有。 */
+/** 工具能力键。key → DSH tool 行 的映射由 adapters/dsh-preset/tools.ts 拥有。 */
 export type ToolKey = 'fs' | 'fs-search' | 'web' | 'bash' | 'skill' | 'todo' | 'ask-user';
 
 /** 编译期产物：一个角色 = 一份 RoleSpec。 */
