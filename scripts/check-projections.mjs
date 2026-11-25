@@ -298,7 +298,8 @@ applyDelegate({
         definition.output === undefined ||
         typeof definition.output !== 'object' ||
         typeof definition.output.render !== 'function' ||
-        definition.output.schema === undefined
+        definition.output.schema === undefined ||
+        definition.output.schema.type !== 'object'
       ) {
         fail(`${definition.name}: 工具定义缺 output { schema, render }，宿主会拒绝注册`);
       }

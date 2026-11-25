@@ -30,6 +30,9 @@ export function toolNameOf(spec: RoleSpec): string {
 
 function registerRole(ctx: Json, spec: RoleSpec): void {
   // 入参 schema 与 outputSchema 共用同一段映射，避免三处各写一遍对象节点。
+  // 注意：这是**裸 JSON Schema**（模型侧原样透传，register() 直通 projectToolSchema）。
+  // 不要把它喂给 defineTool / validateArgs——那边把它当「属性表」编译，会报
+  // `unsupported JSON schema: parameters.type must be a value schema object`。
   const parameters = objectSchema({
     ...spec.task,
     extraNotes: {
