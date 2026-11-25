@@ -1,5 +1,5 @@
 import YAML from 'yaml';
-import type { RoleSpec } from './types.js';
+import type { RoleSpec } from '../../core/types.js';
 import { TOOL_CATALOG } from './tools.js';
 
 /** 一条 DSH preset 声明（对应 @deepseek-ai/dsh-agent-preset 的一行）。 */

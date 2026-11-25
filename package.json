@@ -1,21 +1,22 @@
 {
   "name": "subagent-composer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Compile typed role definitions into DSH agent presets plus a schema-validated delegation tool.",
-  "main": "./dist/plugin/delegate.js",
+  "description": "Compile typed role definitions into DSH agent presets, and project the same roles into dsh_workflow agent() calls.",
+  "main": "./dist/index.js",
   "files": [
     "dist"
   ],
   "exports": {
-    ".": "./dist/plugin/delegate.js",
+    ".": "./dist/index.js",
     "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "check:projections": "node scripts/check-projections.mjs"
   },
   "dsh": {
     "bundle": {

@@ -1,4 +1,4 @@
-import type { ToolKey } from './types.js';
+import type { ToolKey } from '../../core/types.js';
 
 /** 一个 DSH 工具行。id 在 preset 内唯一即可。 */
 export interface ToolRow {

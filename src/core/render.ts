@@ -9,11 +9,20 @@ const TYPE_LABEL: Record<FieldSpec['type'], string> = {
   'object[]': '对象数组',
 };
 
-function fieldLine(name: string, spec: FieldSpec): string {
+/**
+ * 一个字段一行；`object[]` 的子字段由 `fields` 递归渲染成缩进子行。
+ *
+ * 子字段清单**不进 desc**：desc 只写语义，结构由 `fields` 一处提供。
+ * 否则同一份子字段清单会同时存在于 `fields` 与散文里，改名时必然漂移。
+ */
+function fieldLine(name: string, spec: FieldSpec, indent = ''): string {
   const flags = [TYPE_LABEL[spec.type]];
   if (spec.required) flags.push('必填');
   if (spec.values?.length) flags.push(`取值 ${spec.values.join(' / ')}`);
-  return `- \`${name}\`（${flags.join('，')}）：${spec.desc}`;
+  const line = `${indent}- \`${name}\`（${flags.join('，')}）：${spec.desc}`;
+  if (spec.fields === undefined) return line;
+  const children = Object.entries(spec.fields).map(([sub, subSpec]) => fieldLine(sub, subSpec, `${indent}  `));
+  return [line, ...children].join('\n');
 }
 
 /**

@@ -1,11 +1,11 @@
-import type { OutputShape, TaskShape, ToolKey } from '../kernel/types.js';
-import { SubagentRole } from '../kernel/role.js';
+import type { OutputShape, TaskShape, ToolKey } from '../types.js';
+import { SubagentRole } from '../role.js';
 
 /**
  * 示例角色：单节点审查。
  *
  * 刻意保持「无示例、无重复纪律」——身份、边界、步骤、交付字段各写一次，
- * 其余由 kernel 渲染与校验。
+ * 其余由 core 渲染、由 adapters 投影。
  */
 export class NovelAuditRole extends SubagentRole {
   readonly id = 'novel-audit';

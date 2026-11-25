@@ -1,5 +1,6 @@
-import type { OutputShape, TaskShape, ToolKey } from '../kernel/types.js';
-import { SubagentRole } from '../kernel/role.js';
+import type { OutputShape, TaskShape, ToolKey } from '../types.js';
+import { SubagentRole } from '../role.js';
+import { EVIDENCE_CARD_FIELDS } from './shapes.js';
 
 /**
  * 检索阅读员：在分配到的完整文档集内逐篇阅读，产出可核验的证据卡。
@@ -42,7 +43,8 @@ export class RetrievalReaderRole extends SubagentRole {
     evidenceCards: {
       type: 'object[]',
       required: true,
-      desc: '证据卡列表，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
+      desc: '本次阅读产出的证据卡；一条主张一张卡，跨文档支撑时拆成多张',
+      fields: EVIDENCE_CARD_FIELDS,
     },
     coverage: {
       type: 'string[]',

@@ -1,5 +1,5 @@
-import type { RoleSpec } from './kernel/types.js';
-import { assertRoster, assertSpec } from './kernel/validate.js';
+import type { RoleSpec } from './types.js';
+import { assertRoster, assertSpec } from './validate.js';
 import { NovelAuditRole } from './roles/novel-audit.role.js';
 import { RetrievalReaderRole } from './roles/retrieval-reader.role.js';
 import { RetrievalVerifierRole } from './roles/retrieval-verifier.role.js';
