@@ -25,6 +25,8 @@ import {
   toAgentCallTemplate,
 } from '../dist/index.js';
 import { apply as applyDelegate } from '../dist/plugin/delegate.js';
+import { TOOL_CATALOG } from '../dist/adapters/dsh-preset/tools.js';
+import { buildArgs, source as flowSource } from './flows/retrieval-audit.mjs';
 
 const ROOT = process.cwd();
 const problems = [];
@@ -144,6 +146,9 @@ const edgeArgs = (spec, makeValue) =>
 
 for (const spec of specs) {
   const template = toAgentCallTemplate(spec);
+  // 字面占位符的样本取自模板里真实存在的槽，字段改名后这条用例不会退化成空转。
+  const lastJsonSlot = [...template.slots].reverse().find((slot) => slot.kind === 'json');
+  const literalToken = lastJsonSlot === undefined ? '<<seedLedger>>' : `<<${lastJsonSlot.name}>>`;
   const slotNames = template.slots.map((slot) => slot.name);
   if (JSON.stringify(slotNames) !== JSON.stringify(Object.keys(spec.task))) {
     fail(`${spec.id}: 模板占位符 [${slotNames.join(', ')}] 与任务字段不一致`);
@@ -161,7 +166,7 @@ for (const spec of specs) {
     ['值里带占位符字面量', edgeArgs(spec, (field) => {
       const card = sampleValue(field);
       const first = Object.keys(field.fields ?? {})[0];
-      if (first !== undefined) card[0][first] = '见 <<seedLedger>> 的字面量';
+      if (first !== undefined) card[0][first] = `见 ${literalToken} 的字面量`;
       return card;
     })],
   ];
@@ -180,9 +185,13 @@ for (const spec of specs) {
 for (const spec of specs) {
   const row = patchRows.find((candidate) => candidate.id === `preset-${spec.id}`);
   if (!row) continue;
-  const fsRow = (row.config?.plugins ?? []).find((plugin) => plugin.id === 'fs');
-  if (fsRow === undefined) continue;
+  // patch 里 fs 行的 id 是 TOOL_CATALOG.fs.id（tools-fs），不是 role.tools 里的能力键 'fs'。
+  const fsRow = (row.config?.plugins ?? []).find((plugin) => plugin.id === TOOL_CATALOG.fs.id);
+  if (spec.tools.includes('fs') && fsRow === undefined) {
+    fail(`${spec.id}: role.tools 声明了 fs，但 patch 里没有 ${TOOL_CATALOG.fs.id} 行`);
+  }
   const wantReadOnly = spec.readOnly === true;
+  if (fsRow === undefined) continue;
   if (wantReadOnly && (fsRow.config?.write !== false || fsRow.config?.edit !== false)) {
     fail(`${spec.id}: 只读角色的 fs 行必须 write:false / edit:false`);
   }
@@ -191,8 +200,89 @@ for (const spec of specs) {
   }
   // 工具行必须与 role.tools 一一对应且顺序一致（工具面也是投影，不是手写）。
   const toolIds = (row.config?.plugins ?? []).filter((plugin) => plugin.id !== 'persona').map((plugin) => plugin.id);
-  if (JSON.stringify(toolIds) !== JSON.stringify(spec.tools)) {
-    fail(`${spec.id}: patch 工具行 [${toolIds.join(', ')}] 与 role.tools [${spec.tools.join(', ')}] 不一致`);
+  const expectedToolIds = spec.tools.map((key) => TOOL_CATALOG[key].id);
+  if (JSON.stringify(toolIds) !== JSON.stringify(expectedToolIds)) {
+    fail(`${spec.id}: patch 工具行 [${toolIds.join(', ')}] 与 role.tools 的投影 [${expectedToolIds.join(', ')}] 不一致`);
+  }
+}
+
+// 8. 占位符必须都在模板里：声明了槽、模板里却没有，值会被静默丢掉。
+for (const spec of specs) {
+  const template = toAgentCallTemplate(spec);
+  for (const slot of template.slots) {
+    if (!template.promptTemplate.includes(`<<${slot.name}>>`)) {
+      fail(`${spec.id}: 槽 ${slot.name} 声明了，但 promptTemplate 里没有它`);
+    }
+  }
+  // persona/desc 里出现 `<<` 会被当成占位符语法，编译期就该拦住。
+  for (const [name, field] of Object.entries({ ...spec.task, ...spec.output })) {
+    if (field.desc.includes('<<')) fail(`${spec.id}.${name} 的 desc 里出现了 '<<'`);
+  }
+}
+
+// 9. guest 侧真的跑一遍：flow 脚本不能 import 本包，它的 fill 只是另一份同规则实现，
+//    所以必须用假 agent 实跑断言，而不是只检查字符串。
+{
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const guest = new AsyncFunction('args', 'agent', 'phase', 'log', flowSource);
+  // 字面占位符取 verifier 的 json 槽（它一定会出现在 verifier/synthesizer 的 prompt 里）。
+  const verifierSpec = specs.find((spec) => spec.id === 'retrieval-verifier');
+  const verifierJsonSlot = [...toAgentCallTemplate(verifierSpec).slots].reverse().find((slot) => slot.kind === 'json');
+  if (verifierJsonSlot === undefined) fail('retrieval-verifier 没有 json 槽，无法构造字面占位符用例');
+  const hostileToken = `<<${verifierJsonSlot.name}>>`;
+  const prompts = [];
+  let calls = 0;
+  const fakeAgent = async (prompt, options) => {
+    prompts.push({ label: options.label, prompt });
+    calls += 1;
+    if (calls === 1) {
+      return {
+        evidenceCards: [
+          {
+            docPath: 'docs/x.md',
+            evidenceRef: 'docs/x.md:L1-L2',
+            claim: `见 ${hostileToken} 的字面量`,
+            confidence: '高',
+          },
+        ],
+        coverage: ['docs/x.md'],
+        summary: 'ok',
+      };
+    }
+    if (calls === 2) return { verdict: 'pass', missingDocs: [], unsupportedClaims: [], summary: '通过' };
+    return { answer: '结论', citations: ['docs/x.md:L1-L2'], uncertainties: [], summary: '完成' };
+  };
+  const args = buildArgs();
+  args.context.forceSynthesize = true;
+  let result;
+  try {
+    result = await guest(args, fakeAgent, () => {}, () => {});
+  } catch (error) {
+    fail(`flow guest 执行失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (result !== undefined) {
+    if (result.stop !== 'done') fail(`flow guest 应跑到 done，实际 ${result.stop}`);
+    if (calls !== 3) fail(`flow guest 应调用 3 次 agent，实际 ${calls} 次`);
+    const verifierPrompt = prompts[1]?.prompt ?? '';
+    if (!verifierPrompt.includes(`见 ${hostileToken} 的字面量`)) {
+      fail('flow guest 把证据卡里的字面 <<...>> 改写了（填槽被二次替换）');
+    }
+    for (const { label, prompt } of prompts) {
+      for (const [token] of prompt.matchAll(/<<([A-Za-z0-9_]+)>>/g)) {
+        // 只剩证据卡里我们自己塞进去的那个字面量；其余都算没填。
+        if (token !== hostileToken) fail(`flow guest 的 ${label} prompt 里残留占位符 ${token}`);
+      }
+    }
+    // 同一份校验：string[] 里塞对象要报错，不能印成 [object Object]。
+    const hostile = buildArgs();
+    hostile.context.candidatePaths = [{ docPath: 'x' }];
+    try {
+      await guest(hostile, fakeAgent, () => {}, () => {});
+      fail('flow guest 未拒绝 string[] 里的对象项（会印成 [object Object]）');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('数组里有对象')) fail(`flow guest 对 string[] 对象项的报错不合预期：${message}`);
+    }
   }
 }
 

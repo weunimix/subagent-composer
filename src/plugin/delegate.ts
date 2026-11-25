@@ -17,12 +17,11 @@ import type { RoleSpec } from '../core/types.js';
  * 模型一旦省略，子级就静默继承父级 preset —— 身份没了，父级也看不出来。
  * 这里的每个工具把 `agentPreset` 写死成角色 id，模型没有省略的余地。
  *
- * 依赖：`tools` 与 `subagents` 都在 inject 里声明（cordis 的 ctx 代理会拒绝
- * 访问未声明的服务名）。`subagents` 来自宿主，和内置 tool-subagent 同源，
- * preset 组装时可见——之前那次 `never started` 是入口指错（main 指向非插件）。
+ * 依赖：只需要 `tools`。不再声明 `subagents`——`execute` 恒抛错，留着它等于给
+ * 「装载不炸」多加一个硬依赖（cordis 的 inject 是硬依赖，服务缺失整插件不启动）。
  */
 export const name = 'subagent-composer';
-export const inject = ['tools', 'subagents'];
+export const inject = ['tools'];
 
 /** 工具名：标识符友好。 */
 export function toolNameOf(spec: RoleSpec): string {
@@ -51,18 +50,8 @@ function registerRole(ctx: Json, spec: RoleSpec): void {
         .map(([field, def]) => `${field}（${def.type}${def.required === true ? '，必填' : ''}）`)
         .join('、')}。`,
     parameters,
-    output: {
-      schema: {
-        type: 'object',
-        properties: { subagentId: { type: 'string' } },
-        required: ['subagentId'],
-        additionalProperties: false,
-      },
-      render: (_args: unknown, value: { subagentId: string }): unknown => [
-        { type: 'text', text: `started subagent ${value.subagentId}` },
-      ],
-    },
-    isConcurrencySafe: (): boolean => true,
+    // 不声明 output / render / isConcurrencySafe：execute 恒抛错，留一套成功返回的
+    // 形状只会让人以为它能跑。
     async execute(): Promise<never> {
       throw new Error(
         `delegate_${spec.id.replace(/-/g, '_')} 已弃用且在本机不可用：它把 prompt/parent/agentPreset ` +

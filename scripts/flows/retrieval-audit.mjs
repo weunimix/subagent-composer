@@ -56,7 +56,14 @@ function fill(step, values) {
     if (slot.type === 'string[]') {
       if (value === undefined || value === null) return '（空）';
       if (!Array.isArray(value)) throw new Error(name + '：声明为 string[]，收到非数组');
-      return value.length === 0 ? '（空）' : value.map(String).join('、');
+      if (value.length === 0) return '（空）';
+      // 与 core/render-task.ts 同一条校验：数组里有对象就报错，不印 [object Object]。
+      for (var j = 0; j < value.length; j += 1) {
+        if (value[j] !== null && typeof value[j] === 'object') {
+          throw new Error(name + '：声明为 string[]，但数组里有对象');
+        }
+      }
+      return value.map(String).join('、');
     }
     if (value === undefined || value === null) return '';
     if (typeof value === 'object') throw new Error(name + '：声明为 ' + slot.type + '，收到对象');
@@ -75,6 +82,12 @@ function templateProblems(step, label) {
     if (known[match[1]] !== true) problems.push(match[1]);
   }
   if (problems.length > 0) throw new Error(label + '：模板里有未声明的占位符 ' + problems.join(', '));
+  // 反向也要查：声明了槽却不在模板里，值会被静默丢掉。
+  for (var k = 0; k < step.slots.length; k += 1) {
+    if (step.promptTemplate.indexOf('<<' + step.slots[k].name + '>>') === -1) {
+      throw new Error(label + '：槽 ' + step.slots[k].name + ' 声明了，但模板里没有它');
+    }
+  }
 }
 
 function valuesFor(extra) {

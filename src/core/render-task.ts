@@ -21,9 +21,15 @@ function kindOf(type: FieldType): TaskSlot['kind'] {
   return type === 'object[]' ? 'json' : 'text';
 }
 
+/** 报错文案会被模型读到，所以不用 `typeof` 的英文（`收到object` 读起来像笔误）。 */
 function typeName(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return '数组';
+  if (typeof value === 'object') return '对象';
+  if (typeof value === 'string') return '字符串';
+  if (typeof value === 'number') return '数字';
+  if (typeof value === 'boolean') return '布尔值';
+  if (typeof value === 'undefined') return '空值';
   return typeof value;
 }
 
