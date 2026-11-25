@@ -9,4 +9,10 @@ export type {
 } from './core/types.js';
 export { ROLE_CLASSES, compileRoster } from './core/roster.js';
 export { renderTask } from './core/render-task.js';
+export { toAgentCall } from './adapters/dsh-workflow/input.js';
+export type {
+  WorkflowAgentCall,
+  WorkflowAgentOptions,
+  WorkflowAgentOverrides,
+} from './adapters/dsh-workflow/input.js';
 export { toolNameOf } from './plugin/delegate.js';

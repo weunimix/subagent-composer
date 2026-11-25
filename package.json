@@ -15,7 +15,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "check:projections": "node scripts/check-projections.mjs"
   },
   "dsh": {
     "bundle": {

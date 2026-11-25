@@ -4,7 +4,9 @@
 
 DSH（DeepSeek Harness）的角色编译器：`src/core/roles/*.role.ts` →（经两个适配器）→ `dist/cordis.patch.yml` + `dist/roles.json`。
 
-目录：`src/core/` 放角色定义与纯编译（types / validate / discipline / render / schema / render-task / roles / roster），`src/adapters/dsh-preset/` 把 RoleSpec 投影成 DSH preset（emit / tools / director），`src/plugin/delegate.ts` 是运行时派工适配器。角色数据只从 core 流向适配器。
+目录：`src/core/` 放角色定义与纯编译（types / validate / discipline / render / schema / render-task / roles / roster），`src/adapters/dsh-preset/` 把 RoleSpec 投影成 DSH preset（emit / tools / director），`src/adapters/dsh-workflow/` 把 RoleSpec 投影成 dsh_workflow 脚本的 `agent(prompt, options)` 入参，`src/plugin/delegate.ts` 是运行时派工适配器。角色数据只从 core 流向适配器。
+
+`object[]` 字段的子字段用 `FieldSpec.fields` 声明：声明了才产出 `items.properties`，不声明就退化为裸对象。跨角色复用的子字段形状放 `src/core/roles/shapes.ts`，不在各角色里各写一份。
 
 ## 改动前必须知道
 
@@ -18,10 +20,10 @@ DSH（DeepSeek Harness）的角色编译器：`src/core/roles/*.role.ts` →（�
 ## 改完必须做
 
 ```bash
-npm run typecheck && npm run build
+npm run typecheck && npm run build && npm run check:projections
 ```
 
-然后检查 `dist/cordis.patch.yml`：角色数、preset id、工具行是否与 `core/roster.ts` 一致。阶段 1 之后产物必须与抽 core 前逐字节一致，结构变更要先说明。
+然后检查 `dist/cordis.patch.yml`：角色数、preset id、工具行是否与 `core/roster.ts` 一致。阶段 1 之后产物必须与抽 core 前逐字节一致，结构变更要先说明。`check:projections` 断言同一份 RoleSpec 同时驱动 persona 与 workflow outputSchema：改字段只改一处，两份产物跟着变。
 
 ## 提交
 
