@@ -52,7 +52,7 @@ export class RetrievalVerifierRole extends SubagentRole {
     },
     unsupportedClaims: {
       type: 'string[]',
-      desc: '证据卡中没有原文支撑、或引用与原文不一致的主张',
+      desc: '证据卡中没有原文支撑、引用与原文不一致、或量化复算不成立的主张',
     },
     conflicts: {
       type: 'object[]',
@@ -77,6 +77,7 @@ export class RetrievalVerifierRole extends SubagentRole {
     return [
       '只依据 candidatePaths、evidenceCards 与 seedLedger 核对，不引入外部材料。',
       '证据卡与原文不一致时以原文为准；无法回原文核对的引用标为无法核验。',
+      '遇到“唯一、全部、首次、共 N 处、只有”等量化或穷尽性断言时，必须回到 candidatePaths 逐项复算，不能只核对引用。',
       '不修改文件，不替综合者写答案。',
     ];
   }
@@ -86,6 +87,7 @@ export class RetrievalVerifierRole extends SubagentRole {
       '读 issueBrief、focusStatement 与 candidatePaths，建立本轮完整性分母。',
       '逐条核对 evidenceCards 的 docPath、section、quote 是否可回溯，记录无支撑主张。',
       '检查 candidatePaths 是否都有对应证据卡，列出 missingDocs。',
+      '复算所有量化与穷尽性断言：按 candidatePaths 统计，复算不成立的写入 unsupportedClaims。',
       '检查 seedLedger 的轮次与理由，记录 seedIssues；给出 verdict 与 summary。',
     ];
   }
