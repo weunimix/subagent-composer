@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Compile typed role definitions into DSH agent presets plus a schema-validated delegation tool.",
   "main": "./dist/plugin/delegate.js",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./dist/plugin/delegate.js",
     "./package.json": "./package.json"
