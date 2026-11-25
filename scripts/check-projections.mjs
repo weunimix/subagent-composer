@@ -7,7 +7,8 @@
  *   2. object[] 的子字段（FieldSpec.fields）在 outputSchema 里逐层展开；
  *   3. dist/cordis.patch.yml 的 persona 与 RoleSpec.persona 逐字节相等；
  *   4. 角色清单只有 roster 一处 → patch 里的 preset 行与 RoleSpec 一一对应；
- *   5. delegate 工具入参也走同一段映射：子字段一样展开，没有第二份手写 schema。
+ *   5. delegate 工具入参也走同一段映射：子字段一样展开，没有第二份手写 schema；
+ *   6. workflow 的任务模板与 renderTask 同构：把占位符按同一条规则填回去，必须逐字节还原派工单。
  *
  * 跑之前先 npm run build：本脚本读 dist/，不重新编译。
  */
@@ -16,7 +17,7 @@ import { join } from 'node:path';
 
 import YAML from 'yaml';
 
-import { compileRoster, toAgentCall } from '../dist/index.js';
+import { compileRoster, renderTask, toAgentCall, toAgentCallTemplate } from '../dist/index.js';
 import { apply as applyDelegate } from '../dist/plugin/delegate.js';
 
 const ROOT = process.cwd();
@@ -93,6 +94,59 @@ for (const spec of specs) {
   }
 }
 
+// 6. 模板与派工单同构：填回占位符后必须等于 renderTask 的产物。
+const sampleValue = (field) => {
+  switch (field.type) {
+    case 'string':
+      return '示例值';
+    case 'string[]':
+      return ['甲', '乙'];
+    case 'number':
+      return 1;
+    case 'boolean':
+      return true;
+    case 'object[]':
+      return [Object.fromEntries(Object.entries(field.fields ?? {}).map(([name, sub]) => [name, sampleValue(sub)]))];
+    default:
+      return '';
+  }
+};
+// 脚本侧的唯一一份替换规则：json 走 JSON.stringify，text 用顿号连接。
+const fillSlots = (template, values) =>
+  template.slots.reduce((prompt, slot) => {
+    const value = values[slot.name];
+    const text =
+      slot.kind === 'json'
+        ? JSON.stringify(value ?? [], null, 2)
+        : Array.isArray(value)
+          ? value.map(String).join('、')
+          : String(value ?? '');
+    return prompt.replace(`<<${slot.name}>>`, text);
+  }, template.promptTemplate);
+
+for (const spec of specs) {
+  const sampleArgs = Object.fromEntries(
+    Object.entries(spec.task).map(([name, field]) => [name, sampleValue(field)]),
+  );
+  const expected = `${spec.persona}\n\n${renderTask(spec, sampleArgs)}`;
+  const template = toAgentCallTemplate(spec);
+  const slotNames = template.slots.map((slot) => slot.name);
+  if (JSON.stringify(slotNames) !== JSON.stringify(Object.keys(spec.task))) {
+    fail(`${spec.id}: 模板占位符 [${slotNames.join(', ')}] 与任务字段不一致`);
+  }
+  for (const slot of template.slots) {
+    const structured = spec.task[slot.name]?.type === 'object[]';
+    if ((slot.kind === 'json') !== structured) {
+      fail(`${spec.id}.${slot.name}: 占位符类型应为 ${structured ? 'json' : 'text'}`);
+    }
+  }
+  const filled = fillSlots(template, sampleArgs);
+  if (filled !== expected) {
+    const at = [...filled].findIndex((ch, i) => ch !== expected[i]);
+    fail(`${spec.id}: 模板填回后与 renderTask 不一致（首个差异在第 ${at + 1} 个字符）`);
+  }
+}
+
 // 5. delegate 工具入参与 outputSchema 共用映射：object[] 的子字段同样展开。
 const registered = [];
 applyDelegate({
@@ -140,4 +194,5 @@ if (problems.length > 0) {
   console.log(`投影检查通过：${specs.length} 个角色，${patchRows.length} 条 patch 行。`);
   console.log(`  object[] 字段：${objectArrays.join('、') || '无'}`);
   console.log('  同一 desc 同时出现在 persona 与 workflow outputSchema；persona 回读逐字节相等。');
+  console.log('  任务模板填回占位符后与 renderTask 逐字节相等。');
 }

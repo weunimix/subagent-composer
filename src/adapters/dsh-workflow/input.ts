@@ -1,4 +1,4 @@
-import { renderTask, type Json } from '../../core/render-task.js';
+import { renderTask, renderTaskTemplate, type Json, type TaskSlot } from '../../core/render-task.js';
 import { toJsonSchema } from '../../core/schema.js';
 import type { RoleSpec } from '../../core/types.js';
 
@@ -57,6 +57,41 @@ export function toAgentCall(
 
   return {
     prompt: `${spec.persona}\n\n${renderTask(spec, args)}`,
+    options,
+  };
+}
+
+/** 把上游输出填进模板后的调用，形状与 toAgentCall 的产物完全一致。 */
+export interface WorkflowAgentTemplate {
+  /** 含 `<<字段名>>` 占位符的 prompt；人设已经拼在前面。 */
+  promptTemplate: string;
+  /** 需要调用方填的占位符；json 类用 JSON.stringify(value, null, 2)。 */
+  slots: TaskSlot[];
+  options: WorkflowAgentOptions;
+}
+
+/**
+ * 链式场景用的投影：任务字段此刻还没有值，先产出模板，等上游输出到手再填。
+ *
+ * 为什么不在 template 里直接带值：workflow 脚本跑在 guest 里，不能 import 本包，
+ * 所以「拼 prompt」这件事必须在生成期完成、把占位符留给脚本替换。
+ */
+export function toAgentCallTemplate(
+  spec: RoleSpec,
+  overrides: WorkflowAgentOverrides = {},
+): WorkflowAgentTemplate {
+  const options: WorkflowAgentOptions = {
+    label: overrides.label ?? spec.name,
+    schema: toJsonSchema(spec.output),
+  };
+  if (overrides.phase !== undefined) options.phase = overrides.phase;
+  if (overrides.provider !== undefined) options.provider = overrides.provider;
+  if (overrides.model !== undefined) options.model = overrides.model;
+
+  const template = renderTaskTemplate(spec);
+  return {
+    promptTemplate: `${spec.persona}\n\n${template.text}`,
+    slots: template.slots,
     options,
   };
 }
