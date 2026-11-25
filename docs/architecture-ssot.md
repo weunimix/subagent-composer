@@ -56,7 +56,9 @@ adapters/dsh-workflow/input ← 角色 → agent(prompt, options) 投影
 8. **patch 文件带 GENERATED 头**，回读结果必须与 `RoleSpec.persona` 逐字节相等（YAML 块标量）。
 9. **只读角色不落写权限**：`role.tools` 含 `fs` 且 `readOnly` 为真时，生成的 fs 行必须同时关掉 `write` 与 `edit`。**注意**：这条只在 preset 路径成立；workflow 路径继承父级 preset，按任务收权做不到（见「已知缺口」）。
 10. **适配器只做投影**：`adapters/dsh-workflow/input.ts` 是纯函数，不持有状态、不判定失败、不重试、不拼工具面。gate 与重试留在脚本里。
-11. **identity 的保证方式变了**：0.1.x 靠 delegate 把 `agentPreset` 写死；0.2.0 之后靠「persona 内联进 prompt」，preset 不再是身份的载体。delegate 路径已弃用。
+11. **两条路径的填槽规则必须等价**：`fillSlots` 是唯一实现，flow 脚本 guest 里那份同规则副本由 `check:projections` 用假 agent 实跑断言（stop、调用次数、字面量保真、无残留占位符、`string[]` 拒绝对象项），不靠人工验证。
+12. **工具定义必须满足宿主契约**：`tools.register` 要求 `output { schema, render }`，缺了整插件装载失败；`check:projections` 的假 ctx 复刻这条守卫。
+13. **identity 的保证方式变了**：0.1.x 靠 delegate 把 `agentPreset` 写死；0.2.0 之后靠「persona 内联进 prompt」，preset 不再是身份的载体。delegate 路径已弃用。
 
 ## 四、被消除的重复（对照 pi 版，以及抽 core 之前）
 

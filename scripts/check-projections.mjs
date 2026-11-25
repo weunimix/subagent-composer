@@ -191,12 +191,13 @@ for (const spec of specs) {
     fail(`${spec.id}: role.tools 声明了 fs，但 patch 里没有 ${TOOL_CATALOG.fs.id} 行`);
   }
   const wantReadOnly = spec.readOnly === true;
-  if (fsRow === undefined) continue;
-  if (wantReadOnly && (fsRow.config?.write !== false || fsRow.config?.edit !== false)) {
-    fail(`${spec.id}: 只读角色的 fs 行必须 write:false / edit:false`);
-  }
-  if (!wantReadOnly && (fsRow.config?.write === false || fsRow.config?.edit === false)) {
-    fail(`${spec.id}: 可写角色的 fs 行不应关闭 write / edit`);
+  if (fsRow !== undefined) {
+    if (wantReadOnly && (fsRow.config?.write !== false || fsRow.config?.edit !== false)) {
+      fail(`${spec.id}: 只读角色的 fs 行必须 write:false / edit:false`);
+    }
+    if (!wantReadOnly && (fsRow.config?.write === false || fsRow.config?.edit === false)) {
+      fail(`${spec.id}: 可写角色的 fs 行不应关闭 write / edit`);
+    }
   }
   // 工具行必须与 role.tools 一一对应且顺序一致（工具面也是投影，不是手写）。
   const toolIds = (row.config?.plugins ?? []).filter((plugin) => plugin.id !== 'persona').map((plugin) => plugin.id);
@@ -289,7 +290,21 @@ for (const spec of specs) {
 // 5. delegate 工具入参与 outputSchema 共用映射：object[] 的子字段同样展开。
 const registered = [];
 applyDelegate({
-  tools: { register: (definition) => registered.push(definition) },
+  tools: {
+    register: (definition) => {
+      // 复刻宿主 tools.register 的硬校验（dsh-tools/lib/index.js:433）：缺 output.render
+      // 会直接 TypeError，整个 preset 装不上。假 ctx 不能无条件接受。
+      if (
+        definition.output === undefined ||
+        typeof definition.output !== 'object' ||
+        typeof definition.output.render !== 'function' ||
+        definition.output.schema === undefined
+      ) {
+        fail(`${definition.name}: 工具定义缺 output { schema, render }，宿主会拒绝注册`);
+      }
+      registered.push(definition);
+    },
+  },
   subagents: null,
 });
 if (registered.length !== specs.length) {

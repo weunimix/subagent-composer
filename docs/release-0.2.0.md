@@ -22,9 +22,7 @@
 
 ## 弃用
 
-`delegate_<角色>` 仍然注册（老 preset 里还写着本插件），但**调用会直接抛错**并指向 workflow 路径。
-
-`delegate_<角色>`（`src/plugin/delegate.ts`）：0.2.0 弃用，0.3.0 移除。仍注册以保老 preset 装载不炸，但它把 `prompt/parent/agentPreset` 放在嵌套 `request` 里，与 seam 的平铺契约不符，在本机 rc.5 不可用。替代路径：`toAgentCall` / `toAgentCallTemplate` + workflow 脚本。详见 `docs/delegate-vs-workflow.md`。
+`delegate_<角色>`（`src/plugin/delegate.ts`）：0.2.0 弃用，0.3.0 移除。仍注册以保老 preset 装载不炸，但**调用会直接抛错**并指向 workflow 路径——它把 `prompt/parent/agentPreset` 放在嵌套 `request` 里，与 seam 的平铺契约不符，在本机 rc.5 不可用。替代路径：`toAgentCall` / `toAgentCallTemplate` + workflow 脚本。详见 `docs/delegate-vs-workflow.md`。
 
 ## 迁移
 

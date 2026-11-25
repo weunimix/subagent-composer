@@ -29,7 +29,6 @@ function typeName(value: unknown): string {
   if (typeof value === 'string') return '字符串';
   if (typeof value === 'number') return '数字';
   if (typeof value === 'boolean') return '布尔值';
-  if (typeof value === 'undefined') return '空值';
   return typeof value;
 }
 

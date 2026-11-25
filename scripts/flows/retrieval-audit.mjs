@@ -50,7 +50,7 @@ function fill(step, values) {
     var value = values[name];
     if (slot.kind === 'json') {
       if (value === undefined || value === null) return JSON.stringify([], null, 2);
-      if (!Array.isArray(value)) throw new Error(name + '：声明为 object[]，收到非数组');
+      if (!Array.isArray(value)) throw new Error(name + '：声明为 object[]，收到对象');
       return JSON.stringify(value, null, 2);
     }
     if (slot.type === 'string[]') {

@@ -50,8 +50,20 @@ function registerRole(ctx: Json, spec: RoleSpec): void {
         .map(([field, def]) => `${field}（${def.type}${def.required === true ? '，必填' : ''}）`)
         .join('、')}。`,
     parameters,
-    // 不声明 output / render / isConcurrencySafe：execute 恒抛错，留一套成功返回的
-    // 形状只会让人以为它能跑。
+    // output.render 是宿主 `tools.register` 的硬契约（缺了直接 TypeError，整个 preset 装不上），
+    // 不是死代码——即使 execute 恒抛错也必须保留。
+    output: {
+      schema: {
+        type: 'object',
+        properties: { subagentId: { type: 'string' } },
+        required: ['subagentId'],
+        additionalProperties: false,
+      },
+      render: (_args: unknown, value: { subagentId: string }): unknown => [
+        { type: 'text', text: `started subagent ${value.subagentId}` },
+      ],
+    },
+    isConcurrencySafe: (): boolean => true,
     async execute(): Promise<never> {
       throw new Error(
         `delegate_${spec.id.replace(/-/g, '_')} 已弃用且在本机不可用：它把 prompt/parent/agentPreset ` +
