@@ -46,8 +46,8 @@ npm run typecheck
 本仓库是一个 DSH bundle（`package.json` 里的 `dsh.bundle.patch` 指向 `dist/cordis.patch.yml`）。装进本机 DSH 并开始使用：
 
 1. 用 DSH 的插件管理器把**包含本仓库的绝对路径**作为本地包装上（Agent 侧对应 `plugin_manager` 的 `install_bundle`，`target` 填仓库目录）。
-2. 装好后**不需要重启**：bundle 的 patch 会合入 profile，多出 `include:preset-novel-audit` 与 `include:preset-subagent-director` 两条 preset 行。
-3. 新开一个会话，在 Agent 预设里选择 `调度者`（id `subagent-director`），它会把活派给对应角色的子 agent（当前是 `节点审查` / `novel-audit`）。
+2. 装好后**不需要重启**：bundle 的 patch 会合入 profile，多出各角色 preset 行与 `include:preset-subagent-director`。
+3. 新开一个会话，在 Agent 预设里选择 `调度者`（id `subagent-director`），它会把活派给对应角色的子 agent（当前有 `节点审查` / `novel-audit`，以及 `检索阅读员`、`检索验证员`、`检索综合员`）。
 
 两条约束：
 
