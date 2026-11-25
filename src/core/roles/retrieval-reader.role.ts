@@ -43,7 +43,7 @@ export class RetrievalReaderRole extends SubagentRole {
     evidenceCards: {
       type: 'object[]',
       required: true,
-      desc: '证据卡列表，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
+      desc: '本次阅读产出的证据卡；一条主张一张卡，跨文档支撑时拆成多张',
       fields: EVIDENCE_CARD_FIELDS,
     },
     coverage: {

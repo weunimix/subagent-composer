@@ -46,7 +46,7 @@ export interface WorkflowAgentOverrides {
 
 /**
  * RoleSpec + 本次任务字段 → 一次 workflow 子 agent 调用。
- * 人设与任务单拼在同一段 prompt 里：persona 在前，任务单在后，与 delegate 路径同样的顺序。
+ * 人设与任务单拼在同一段 prompt 里：persona 在前，任务单在后，与 preset 注入 persona 的顺序一致。
  */
 export function toAgentCall(
   spec: RoleSpec,

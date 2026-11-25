@@ -27,7 +27,7 @@ export class RetrievalSynthesizerRole extends SubagentRole {
     evidenceCards: {
       type: 'object[]',
       required: true,
-      desc: '读者提交的证据卡，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
+      desc: '读者提交的证据卡；成稿只依据这些卡片，不再补读原文',
       fields: EVIDENCE_CARD_FIELDS,
     },
     verificationNotes: {
@@ -36,7 +36,7 @@ export class RetrievalSynthesizerRole extends SubagentRole {
     },
     seedLedger: {
       type: 'object[]',
-      desc: '种子台账，每项含 docPath、initialRole、currentRole、evidenceRef、round、reason',
+      desc: '种子台账，记录候选文档在本轮的初始角色、当前角色与轮次',
       fields: SEED_LEDGER_FIELDS,
     },
   };

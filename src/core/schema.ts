@@ -1,6 +1,6 @@
 import type { FieldSpec, TaskShape } from './types.js';
 
-/** 只覆盖本编译器会生成的子集，够 DSH 的 structured_output 与 delegate 入参使用。 */
+/** 只覆盖本编译器会生成的子集，够 DSH 的 structured_output 与 workflow 入参使用。 */
 export function toJsonSchema(fields: TaskShape): Record<string, unknown> {
   return objectSchema(fields);
 }

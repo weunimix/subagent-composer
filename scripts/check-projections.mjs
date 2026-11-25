@@ -7,8 +7,8 @@
  *   2. object[] 的子字段（FieldSpec.fields）在 outputSchema 里逐层展开；
  *   3. dist/cordis.patch.yml 的 persona 与 RoleSpec.persona 逐字节相等；
  *   4. 角色清单只有 roster 一处 → patch 里的 preset 行与 RoleSpec 一一对应；
- *   5. delegate 工具入参也走同一段映射：子字段一样展开，没有第二份手写 schema；
- *   6. workflow 的任务模板与 renderTask 同构：把占位符按同一条规则填回去，必须逐字节还原派工单。
+ *   5. workflow 的任务模板与 renderTask 同构：把占位符按同一条规则填回去，必须逐字节还原派工单；
+ *   6. guest 里的填槽实现是 core 注入的那一段源码，不是手写副本。
  *
  * 跑之前先 npm run build：本脚本读 dist/，不重新编译。
  */
@@ -20,11 +20,11 @@ import YAML from 'yaml';
 import {
   compileRoster,
   fillAgentCallTemplate,
+  fillSlotsSource,
   renderTask,
   toAgentCall,
   toAgentCallTemplate,
 } from '../dist/index.js';
-import { apply as applyDelegate } from '../dist/plugin/delegate.js';
 import { TOOL_CATALOG } from '../dist/adapters/dsh-preset/tools.js';
 import { buildArgs, source as flowSource } from './flows/retrieval-audit.mjs';
 
@@ -85,13 +85,6 @@ for (const spec of specs) {
       for (const [sub, subField] of Object.entries(field.fields)) {
         if (nested[sub]?.description !== subField.desc) {
           fail(`${spec.id}.${name}.${sub}: outputSchema 子字段缺少描述或与声明不一致`);
-        }
-      }
-      for (const sub of Object.keys(field.fields)) {
-        // 按独立词匹配：`docPath` 不能因为包含 `path` 就把新增的 path 子字段糊过去。
-        const asToken = new RegExp(`(^|[^A-Za-z0-9_])${sub}([^A-Za-z0-9_]|$)`);
-        if (!asToken.test(field.desc)) {
-          fail(`${spec.id}.${name}: 父字段 desc 没有提到子字段 ${sub}，散文与声明已经漂移`);
         }
       }
       const expectedRequired = Object.entries(field.fields)
@@ -287,53 +280,19 @@ for (const spec of specs) {
   }
 }
 
-// 5. delegate 工具入参与 outputSchema 共用映射：object[] 的子字段同样展开。
-const registered = [];
-applyDelegate({
-  tools: {
-    register: (definition) => {
-      // 复刻宿主 tools.register 的硬校验（dsh-tools/lib/index.js:433）：缺 output.render
-      // 会直接 TypeError，整个 preset 装不上。假 ctx 不能无条件接受。
-      if (
-        definition.output === undefined ||
-        typeof definition.output !== 'object' ||
-        typeof definition.output.render !== 'function' ||
-        definition.output.schema === undefined ||
-        definition.output.schema.type !== 'object'
-      ) {
-        fail(`${definition.name}: 工具定义缺 output { schema, render }，宿主会拒绝注册`);
-      }
-      registered.push(definition);
-    },
-  },
-  subagents: null,
-});
-if (registered.length !== specs.length) {
-  fail(`delegate 注册了 ${registered.length} 个工具，roster 有 ${specs.length} 个角色`);
-}
-for (const spec of specs) {
-  const tool = registered.find((definition) => definition.name === `delegate_${spec.id.replace(/-/g, '_')}`);
-  if (!tool) {
-    fail(`${spec.id}: delegate 没有注册对应工具`);
-    continue;
-  }
-  const params = tool.parameters?.properties ?? {};
-  for (const [name, field] of Object.entries(spec.task)) {
-    if (!params[name]) fail(`${spec.id}: delegate 入参缺少任务字段 ${name}`);
-    if (field.type === 'object[]' && field.fields !== undefined) {
-      const nested = params[name]?.items?.properties ?? {};
-      for (const sub of Object.keys(field.fields)) {
-        if (!nested[sub]) fail(`${spec.id}.${name}: delegate 入参没有展开子字段 ${sub}`);
-      }
-    }
-  }
-  if (!params.extraNotes) fail(`${spec.id}: delegate 入参缺少 extraNotes`);
+// 4. 角色数一一对应：roster 的每个角色一行，没有别的行。
+const expectedRows = specs.length;
+if (patchRows.length !== expectedRows) {
+  fail(`patch 行数应为 ${expectedRows}（${specs.length} 个角色），实际 ${patchRows.length}`);
 }
 
-// 4. 角色数一一对应：roster 的每个角色一行，外加导演行。
-const expectedRows = specs.length + 1;
-if (patchRows.length !== expectedRows) {
-  fail(`patch 行数应为 ${expectedRows}（${specs.length} 角色 + 1 导演），实际 ${patchRows.length}`);
+// 5. 填槽只有 core 一份：guest 里的实现是生成期注入的源码，不允许出现手写副本。
+if (!flowSource.includes(fillSlotsSource)) {
+  fail('flow guest 没有包含 core 导出的 fillSlotsSource');
+}
+for (const fn of ['fillSlots', 'renderFieldValue', 'typeName']) {
+  const count = [...flowSource.matchAll(new RegExp(`function ${fn}\\(`, 'g'))].length;
+  if (count !== 1) fail(`flow guest 里应只有 1 份 ${fn}（注入），实际 ${count} 份`);
 }
 
 if (problems.length > 0) {

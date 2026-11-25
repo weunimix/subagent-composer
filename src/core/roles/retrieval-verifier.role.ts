@@ -32,12 +32,12 @@ export class RetrievalVerifierRole extends SubagentRole {
     evidenceCards: {
       type: 'object[]',
       required: true,
-      desc: '读者提交的证据卡，每项含 docPath、evidenceRef、section、claim、quote、relation、confidence',
+      desc: '读者提交的证据卡，逐张核对引用是否落在原文、覆盖是否完整、与其它材料是否冲突',
       fields: EVIDENCE_CARD_FIELDS,
     },
     seedLedger: {
       type: 'object[]',
-      desc: '种子台账，每项含 docPath、initialRole、currentRole、evidenceRef、round、reason',
+      desc: '种子台账，记录候选文档在本轮的初始角色、当前角色与轮次',
       fields: SEED_LEDGER_FIELDS,
     },
   };

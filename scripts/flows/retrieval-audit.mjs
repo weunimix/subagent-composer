@@ -13,7 +13,7 @@
  * 本包，所以 prompt 必须在生成期拼好；上游输出还不存在的字段留成 `<<字段名>>`
  * 占位符，由脚本在运行期填。
  */
-import { compileRoster } from '../../dist/index.js';
+import { compileRoster, fillSlotsSource } from '../../dist/index.js';
 import { toAgentCall, toAgentCallTemplate } from '../../dist/index.js';
 
 const specOf = (id) => {
@@ -33,42 +33,22 @@ export const meta = {
   ],
 };
 
-export const source = String.raw`
+const rawSource = String.raw`
 var steps = args.steps;
 var context = args.context;
 var maxAttempts = args.maxAttempts || 2;
 
-// 一次正则替换：替换进来的文本不会再被扫描，所以字段值里出现字面 <<x>> 不会打乱别的槽。
-var SLOT = /<<([A-Za-z0-9_]+)>>/g;
+// 占位符语法：填槽时一次替换，替换文本不会被二次扫描。
+var SLOT_PATTERN = /<<([A-Za-z0-9_]+)>>/g;
+
+// 填槽实现由 core 在生成期注入（fillSlotsSource）：运行期跑的就是同一段源码，
+// 不是 guest 里另写的一份副本。
+__FILL_SLOTS_SOURCE__
 
 function fill(step, values) {
-  var byName = {};
-  for (var i = 0; i < step.slots.length; i += 1) byName[step.slots[i].name] = step.slots[i];
-  return step.promptTemplate.replace(SLOT, function (raw, name) {
-    var slot = byName[name];
-    if (slot === undefined) throw new Error('模板里出现未声明的占位符 ' + raw);
-    var value = values[name];
-    if (slot.kind === 'json') {
-      if (value === undefined || value === null) return JSON.stringify([], null, 2);
-      if (!Array.isArray(value)) throw new Error(name + '：声明为 object[]，收到对象');
-      return JSON.stringify(value, null, 2);
-    }
-    if (slot.type === 'string[]') {
-      if (value === undefined || value === null) return '（空）';
-      if (!Array.isArray(value)) throw new Error(name + '：声明为 string[]，收到非数组');
-      if (value.length === 0) return '（空）';
-      // 与 core/render-task.ts 同一条校验：数组里有对象就报错，不印 [object Object]。
-      for (var j = 0; j < value.length; j += 1) {
-        if (value[j] !== null && typeof value[j] === 'object') {
-          throw new Error(name + '：声明为 string[]，但数组里有对象');
-        }
-      }
-      return value.map(String).join('、');
-    }
-    if (value === undefined || value === null) return '';
-    if (typeof value === 'object') throw new Error(name + '：声明为 ' + slot.type + '，收到对象');
-    return String(value);
-  });
+  // 已渲染好的步骤（如 reader 的 toAgentCall 产物）没有槽，原样返回。
+  if (step.slots.length === 0) return step.promptTemplate;
+  return fillSlots(step.promptTemplate, step.slots, values);
 }
 
 /** 模板本身是否还留着自己没声明的占位符——只校验模板，不校验填好的 prompt。 */
@@ -77,7 +57,7 @@ function templateProblems(step, label) {
   for (var i = 0; i < step.slots.length; i += 1) known[step.slots[i].name] = true;
   var problems = [];
   var match;
-  var pattern = new RegExp(SLOT.source, 'g');
+  var pattern = new RegExp(SLOT_PATTERN.source, 'g');
   while ((match = pattern.exec(step.promptTemplate)) !== null) {
     if (known[match[1]] !== true) problems.push(match[1]);
   }
@@ -179,6 +159,9 @@ return {
   summary: synthesizer.out.summary,
 };
 `;
+
+/** 注入填槽源码：用函数式 replace，避免被替换文本里的 `$` 序列二次解释。 */
+export const source = rawSource.replace('__FILL_SLOTS_SOURCE__', () => fillSlotsSource);
 
 const callToStep = (call) => ({ promptTemplate: call.prompt, slots: [], options: call.options });
 

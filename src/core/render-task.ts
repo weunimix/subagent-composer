@@ -7,9 +7,6 @@ export function slotToken(name: string): string {
   return `<<${name}>>`;
 }
 
-/** 占位符语法。填槽时用一次替换，替换文本不会被二次扫描。 */
-const SLOT_PATTERN = /<<([A-Za-z0-9_]+)>>/g;
-
 /**
  * 渲染方式只由**字段声明**决定，不看运行期的值。
  *
@@ -150,13 +147,25 @@ export function fillSlots(
   slots: readonly TaskSlot[],
   values: Record<string, unknown>,
 ): string {
-  const byName = new Map(slots.map((slot) => [slot.name, slot]));
-  return text.replace(SLOT_PATTERN, (raw, name: string) => {
+  const byName = new Map<string, TaskSlot>();
+  for (const slot of slots) byName.set(slot.name, slot);
+  return text.replace(/<<([A-Za-z0-9_]+)>>/g, (raw: string, name: string) => {
     const slot = byName.get(name);
     if (slot === undefined) throw new Error(`模板里出现未声明的占位符 ${raw}`);
     return renderFieldValue(slot.name, { type: slot.type }, values[slot.name]);
   });
 }
+
+/**
+ * 交给 workflow guest 的同一段填槽实现（源码文本）。
+ *
+ * guest 沙箱没有 `import`，只能两段式；但「两份实现」不该靠断言维持一致。
+ * 这里把自包含的三个函数原样导出，flow 脚本在生成期把这段源码注入 guest，
+ * 于是运行期跑的就是 core 的这份代码，而不是它的手写副本。
+ */
+export const fillSlotsSource: string = [typeName, renderFieldValue, fillSlots]
+  .map((fn) => fn.toString())
+  .join('\n\n');
 
 /** 任务单模板填槽。 */
 export function fillTaskTemplate(template: TaskTemplate, values: Record<string, unknown>): string {
