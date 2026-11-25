@@ -57,6 +57,10 @@ export class RetrievalSynthesizerRole extends SubagentRole {
       type: 'object[]',
       desc: '未解决的冲突，每项含 topic、sides、evidenceRefs、whyUnresolved',
     },
+    presumption: {
+      type: 'object[]',
+      desc: '命名或分类无仲裁条款时的推定口径，每项含 topic、basis、confidence、unresolved；没有则省略',
+    },
     summary: {
       type: 'string',
       required: true,
@@ -73,6 +77,7 @@ export class RetrievalSynthesizerRole extends SubagentRole {
       '只使用 evidenceCards 与 verificationNotes 中的材料；需要新事实时写进 uncertainties。',
       '答案中的每个事实性主张都要有 citations 指向证据卡中的 docPath。',
       '冲突不强行合并；写进 conflicts，并说明哪种解释证据更强。',
+      'scope 内没有命名或分类仲裁条款时，必须把结论标为推定口径，写入 presumption，说明依据与置信度；不得伪装成既定事实。',
     ];
   }
 
@@ -81,7 +86,8 @@ export class RetrievalSynthesizerRole extends SubagentRole {
       '读 issueBrief 与 focusStatement，确认要回答的问题与中心。',
       '按主题归并 evidenceCards，区分支持、削弱、冲突与推断。',
       '处理 verificationNotes：缺口写入 uncertainties，冲突写入 conflicts。',
-      '给出 answer、citations、uncertainties、conflicts 与 summary。',
+      '检查是否存在命名或分类仲裁条款；没有则在 presumption 中记录推定口径、依据、置信度与未决项。',
+      '给出 answer、citations、uncertainties、conflicts、presumption（如有）与 summary。',
     ];
   }
 }
