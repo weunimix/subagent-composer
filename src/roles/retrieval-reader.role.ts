@@ -1,0 +1,83 @@
+import type { OutputShape, TaskShape, ToolKey } from '../kernel/types.js';
+import { SubagentRole } from '../kernel/role.js';
+
+/**
+ * 检索阅读员：在分配到的完整文档集内逐篇阅读，产出可核验的证据卡。
+ */
+export class RetrievalReaderRole extends SubagentRole {
+  readonly id = 'retrieval-reader';
+  readonly name = '检索阅读员';
+  readonly when = '需要按完整候选集阅读全文并产出证据卡时';
+  readonly order = 201;
+  readonly tools: readonly ToolKey[] = ['fs', 'fs-search'];
+  readonly readOnly = true;
+
+  readonly task: TaskShape = {
+    issueBrief: {
+      type: 'string',
+      required: true,
+      desc: '议题简报：要回答的问题、边界与已知背景',
+    },
+    focusStatement: {
+      type: 'string',
+      required: true,
+      desc: '当前议题中心陈述；只用于判断证据与焦点的关系',
+    },
+    docPaths: {
+      type: 'string[]',
+      required: true,
+      desc: '本轮分配的全部文档路径，相对项目根；必须全部阅读',
+    },
+    seedCenter: {
+      type: 'string[]',
+      desc: '当前种子中心文档路径；省略表示尚未形成中心',
+    },
+    round: {
+      type: 'number',
+      desc: '当前校准轮次；首轮省略或填 0',
+    },
+  };
+
+  readonly output: OutputShape = {
+    evidenceCards: {
+      type: 'object[]',
+      required: true,
+      desc: '证据卡列表，每项含 docPath、section、claim、quote、relation、confidence',
+    },
+    coverage: {
+      type: 'string[]',
+      required: true,
+      desc: '已读文档路径；必须覆盖 docPaths 全部条目',
+    },
+    questions: {
+      type: 'string[]',
+      desc: '阅读中无法由现有材料回答的问题',
+    },
+    summary: {
+      type: 'string',
+      required: true,
+      desc: '三句话以内说明本轮证据对议题中心的支持或削弱',
+    },
+  };
+
+  identity(): string {
+    return '你是检索阅读员：按分配到的完整文档集逐篇阅读全文，产出可核验的证据卡；不筛选文档，不综合最终结论。';
+  }
+
+  extraDiscipline(): string[] {
+    return [
+      '必须读完 docPaths 的全部文档；漏读的文档写进 questions，不能静默跳过。',
+      '只记录原文支持的内容：claim 与 quote 必须来自所读文档，推断要标 relation 为推断并说明依据。',
+      '不修改文件，不替规划者决定议题中心；对中心的异议写进 summary 或 questions。',
+    ];
+  }
+
+  steps(): string[] {
+    return [
+      '读 issueBrief 与 focusStatement，确认本轮要回答什么、中心是什么。',
+      '逐篇阅读 docPaths 指向的全文，按章节记录与议题相关的原文。',
+      '把原文整理成证据卡，标注它与中心的关系：支持、削弱、无关、冲突或推断。',
+      '核对 coverage 是否覆盖全部 docPaths，提交证据卡与未决问题。',
+    ];
+  }
+}
