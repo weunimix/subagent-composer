@@ -17,7 +17,7 @@ const call = toAgentCall(reader, { issueBrief, focusStatement, docPaths, round: 
 const result = await agent(call.prompt, call.options);
 ```
 
-- `prompt` = `persona` + 空行 + `renderTask(spec, args)`。与 delegate 路径同一份措辞：delegate 的 prompt 只含任务单、人设由 preset 注入；workflow 子 agent 拿不到我们的 preset，所以人设必须随 prompt 走。
+- `prompt` = `persona` + 空行 + `renderTask(spec, args)`。workflow 子 agent 拿不到我们的 preset，所以人设必须随 prompt 走；这与 preset 路径「人设由 prefix 注入」是同一份 persona 的两种承载。
 - `options` 只放脚本层认识的键：`label`（默认 `spec.name`）、`schema`（`toJsonSchema(spec.output)`），以及可选的 `phase` / `provider` / `model`。
 
 ## 为什么是这个形状（阶段 0 实测）
@@ -43,7 +43,7 @@ const result = await agent(call.prompt, call.options);
 npm run typecheck && npm run build && npm run check:projections
 ```
 
-`check:projections` 断言：交付字段的 desc 同时出现在 persona 与 workflow schema；`object[]` 子字段在 schema 里逐层展开且 required 一致；patch 里的 persona 与 `RoleSpec.persona` 逐字节相等；delegate 入参也展开同一批子字段。
+`check:projections` 断言：交付字段的 desc 同时出现在 persona 与 workflow schema；`object[]` 子字段在 schema 里逐层展开且 required 一致，persona 的缩进子行与之一一对应；patch 里的 persona 与 `RoleSpec.persona` 逐字节相等；任务模板填回占位符后与 `renderTask` 逐字节相等；guest 里的填槽实现就是 core 注入的那段源码。
 
 真实运行记录：run `p2-adapter-agent-call`，把 `toAgentCall(retrieval-reader, …)` 的产物直接喂 `agent()`，返回 14 张证据卡，7 个子字段齐全，`relation` / `confidence` 落在 enum 内。
 

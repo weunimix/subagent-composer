@@ -15,7 +15,7 @@
 | 执行层可以整体迁走 | 派工目标、顺序、并发、等待、gate、失败判定、重试/超时策略都能由 workflow 脚本承担 |
 | 身份与权限载体迁不走 | 子 agent 的 persona 只能内联进 prompt；工具面 / readOnly 只能由 agent preset 决定，而脚本层没有指定 preset 的入口 |
 | 有两项能力当前版本根本没有 | per-task `usage`、run 持久化（`workflow_manage runs` 返回 `[]`），迁移后也不会凭空出现 |
-| 因此插件的边界 | 从「角色定义 + 派工工具」缩为「角色定义编译器」：同一份 `RoleSpec` 投影成 preset（权限/身份给 DSH 用）与 workflow 调用（prompt + schema 给脚本用）；`delegate_*` 退役 |
+| 因此插件的边界 | 从「角色定义 + 派工工具」缩为「角色定义编译器」：同一份 `RoleSpec` 投影成 preset（权限/身份给 DSH 用）与 workflow 调用（prompt + schema 给脚本用）；`delegate_*` 已删除（0.2.0 收口） |
 
 一句话：**方案里的「结果 B」不是退而求其次，而是这个版本上唯一成立的形态**——workflow 拿不到 preset，所以它必须拿到完整的 prompt；而 prompt 只能由编译器在生成期给出。
 
