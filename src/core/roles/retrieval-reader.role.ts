@@ -1,5 +1,5 @@
-import type { OutputShape, TaskShape, ToolKey } from '../kernel/types.js';
-import { SubagentRole } from '../kernel/role.js';
+import type { OutputShape, TaskShape, ToolKey } from '../types.js';
+import { SubagentRole } from '../role.js';
 
 /**
  * 检索阅读员：在分配到的完整文档集内逐篇阅读，产出可核验的证据卡。

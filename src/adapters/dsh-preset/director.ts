@@ -1,5 +1,5 @@
-import type { PresetRow } from './kernel/emit.js';
-import { TOOL_CATALOG } from './kernel/tools.js';
+import type { PresetRow } from './emit.js';
+import { TOOL_CATALOG } from './tools.js';
 
 /**
  * 导演 preset：本项目的主会话入口。

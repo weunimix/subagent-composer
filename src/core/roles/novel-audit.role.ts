@@ -1,5 +1,5 @@
-import type { OutputShape, TaskShape, ToolKey } from '../kernel/types.js';
-import { SubagentRole } from '../kernel/role.js';
+import type { OutputShape, TaskShape, ToolKey } from '../types.js';
+import { SubagentRole } from '../role.js';
 
 /**
  * 示例角色：单节点审查。

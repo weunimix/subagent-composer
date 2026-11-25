@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { directorPreset } from './director.js';
-import { emitPatch, rolePreset } from './kernel/emit.js';
-import type { RoleSpec } from './kernel/types.js';
-import { compileRoster } from './roster.js';
+import { directorPreset } from './adapters/dsh-preset/director.js';
+import { emitPatch, rolePreset } from './adapters/dsh-preset/emit.js';
+import type { RoleSpec } from './core/types.js';
+import { compileRoster } from './core/roster.js';
 
 /**
  * 编译入口：roles/ → dist/。

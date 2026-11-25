@@ -1,5 +1,5 @@
-import type { OutputShape, TaskShape, ToolKey } from '../kernel/types.js';
-import { SubagentRole } from '../kernel/role.js';
+import type { OutputShape, TaskShape, ToolKey } from '../types.js';
+import { SubagentRole } from '../role.js';
 
 /**
  * 检索验证员：独立核对读者是否覆盖完整候选集、证据是否可回溯、冲突是否被记录。

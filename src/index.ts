@@ -1,4 +1,4 @@
-export { SubagentRole } from './kernel/role.js';
+export { SubagentRole } from './core/role.js';
 export type {
   FieldSpec,
   FieldType,
@@ -6,6 +6,7 @@ export type {
   RoleSpec,
   TaskShape,
   ToolKey,
-} from './kernel/types.js';
-export { ROLE_CLASSES, compileRoster } from './roster.js';
-export { renderTask, toolNameOf } from './plugin/delegate.js';
+} from './core/types.js';
+export { ROLE_CLASSES, compileRoster } from './core/roster.js';
+export { renderTask } from './core/render-task.js';
+export { toolNameOf } from './plugin/delegate.js';
