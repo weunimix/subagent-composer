@@ -13,6 +13,10 @@ export const EVIDENCE_CARD_FIELDS: TaskShape = {
     required: true,
     desc: '证据所在文档路径，相对项目根',
   },
+  fragmentId: {
+    type: 'string',
+    desc: '可选，H2/H3 片段 ID，形如 文档路径#小节标题；整篇文档证据可省略',
+  },
   evidenceRef: {
     type: 'string',
     required: true,
@@ -33,7 +37,7 @@ export const EVIDENCE_CARD_FIELDS: TaskShape = {
   },
   relation: {
     type: 'string',
-    values: ['支持', '削弱', '无关', '冲突', '推断'],
+    values: ['supports', 'contradicts', 'context', 'gap'],
     desc: '与议题中心陈述的关系',
   },
   confidence: {

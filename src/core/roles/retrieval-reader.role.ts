@@ -27,7 +27,11 @@ export class RetrievalReaderRole extends SubagentRole {
     docPaths: {
       type: 'string[]',
       required: true,
-      desc: '本轮分配的全部文档路径，相对项目根；必须全部阅读',
+      desc: '本轮分配的全文章节路径，相对项目根；没有片段索引的文档必须全部阅读',
+    },
+    sectionPaths: {
+      type: 'string[]',
+      desc: '本轮分配的 H2/H3 片段 ID，形如 文档路径#小节标题；有片段时只读片段，不读整篇',
     },
     seedCenter: {
       type: 'string[]',
@@ -51,6 +55,10 @@ export class RetrievalReaderRole extends SubagentRole {
       required: true,
       desc: '已读文档路径；必须覆盖 docPaths 全部条目',
     },
+    sectionCoverage: {
+      type: 'string[]',
+      desc: '已读片段 ID；必须覆盖 sectionPaths 全部条目',
+    },
     boundaryNotes: {
       type: 'string[]',
       desc: '阅读中遇到的 scope 外文件及其处理方式；这些文件不产出证据卡',
@@ -67,13 +75,14 @@ export class RetrievalReaderRole extends SubagentRole {
   };
 
   identity(): string {
-    return '你是检索阅读员：按分配到的完整文档集逐篇阅读全文，产出可核验的证据卡；不筛选文档，不综合最终结论。';
+    return '你是检索阅读员：按分配到的片段或全文文档逐段阅读原文，产出可核验的证据卡；不筛选文档，不综合最终结论。';
   }
 
   extraDiscipline(): string[] {
     return [
-      '必须读完 docPaths 的全部文档；漏读的文档写进 questions，不能静默跳过。',
-      '只读 docPaths 指定的文档；读到 scope 外文件时写入 boundaryNotes，不产出证据卡，不进入综合。',
+      '必须读完 sectionPaths 的全部片段与 docPaths 的全部全文文档；漏读的写进 questions，不能静默跳过。',
+      '只读 sectionPaths 指定的片段与 docPaths 指定的文档；读到 scope 外文件时写入 boundaryNotes，不产出证据卡，不进入综合。',
+      '证据卡挂 fragmentId；片段证据的 fragmentId 必须是 sectionPaths 中的 ID，quote 必须落在该片段行区间内。',
       '只记录原文支持的内容：claim 与 quote 必须来自所读文档，推断要标 relation 为推断并说明依据。',
       '证据位置必须使用 path:L15-L17 形式的行区间，不写无行号的概述。',
       '不修改文件，不替规划者决定议题中心；对中心的异议写进 summary 或 questions。',
@@ -83,9 +92,9 @@ export class RetrievalReaderRole extends SubagentRole {
   steps(): string[] {
     return [
       '读 issueBrief 与 focusStatement，确认本轮要回答什么、中心是什么。',
-      '逐篇阅读 docPaths 指向的全文，按章节记录与议题相关的原文和行区间。',
-      '把原文整理成证据卡，标注它与中心的关系：支持、削弱、无关、冲突或推断。',
-      '核对 coverage 是否覆盖全部 docPaths；把 scope 外文件写入 boundaryNotes。',
+      '逐段阅读 sectionPaths 指向的片段；没有片段的文档逐篇阅读 docPaths 指向的全文。按章节记录与议题相关的原文和行区间。',
+      '把原文整理成证据卡，标注它与中心的关系：supports、contradicts、context、gap；片段证据写明 fragmentId。',
+      '核对 sectionCoverage 与 coverage 是否覆盖全部 sectionPaths 与 docPaths；把 scope 外文件写入 boundaryNotes。',
       '提交证据卡、覆盖情况、边界记录与未决问题。',
     ];
   }
