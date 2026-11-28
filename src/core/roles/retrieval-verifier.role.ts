@@ -29,6 +29,10 @@ export class RetrievalVerifierRole extends SubagentRole {
       required: true,
       desc: '完整性分母：本轮全部候选文档路径，相对项目根',
     },
+    candidateSections: {
+      type: 'string[]',
+      desc: '本轮全部候选片段 ID；候选片段必须都有证据卡或 boundaryNotes',
+    },
     evidenceCards: {
       type: 'object[]',
       required: true,
@@ -52,6 +56,10 @@ export class RetrievalVerifierRole extends SubagentRole {
     missingDocs: {
       type: 'string[]',
       desc: '候选集中没有对应证据卡的文档路径',
+    },
+    missingSections: {
+      type: 'string[]',
+      desc: '候选片段中没有对应证据卡或 boundaryNotes 的片段 ID',
     },
     unsupportedClaims: {
       type: 'string[]',
@@ -86,7 +94,8 @@ export class RetrievalVerifierRole extends SubagentRole {
 
   extraDiscipline(): string[] {
     return [
-      '只依据 candidatePaths、evidenceCards 与 seedLedger 核对，不引入外部材料。',
+      '只依据 candidatePaths、candidateSections、evidenceCards 与 seedLedger 核对，不引入外部材料。',
+      '候选片段的 fragmentId 必须能在候选片段集中解析；fragmentId 不存在或 quote 超出片段行区间时，记 unsupportedClaims。',
       '证据卡与原文不一致时以原文为准；无法回原文核对的引用标为无法核验。',
       '遇到“唯一、全部、首次、共 N 处、只有”等量化或穷尽性断言时，必须回到 candidatePaths 逐项复算，不能只核对引用；每条断言必须附可复现的检索式或文件清单。',
       '遇到“scope 内没有、没有任何、零命中”等否定性结论时，必须核对已读篇数、扫描篇数、分母和检索式；缺覆盖度的结论写入 unsupportedClaims 或 negativeClaims，不能放行。',
@@ -98,7 +107,7 @@ export class RetrievalVerifierRole extends SubagentRole {
     return [
       '读 issueBrief、focusStatement 与 candidatePaths，建立本轮完整性分母。',
       '逐条核对 evidenceCards 的 docPath、evidenceRef、section、quote 是否可回溯，记录无支撑主张。',
-      '检查 candidatePaths 是否都有对应证据卡，列出 missingDocs。',
+      '检查 candidatePaths 是否都有对应证据卡，列出 missingDocs；检查 candidateSections 是否都有卡或边界注，列出 missingSections。',
       '复算所有量化与穷尽性断言，检查每条断言的检索式；结果写入 assertionChecks，不成立写入 unsupportedClaims。',
       '核对否定性结论的覆盖度，写入 negativeClaims。',
       '检查 seedLedger 的轮次与理由，记录 seedIssues；给出 verdict 与 summary。',
